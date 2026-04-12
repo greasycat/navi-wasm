@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Navi WASM Demo</title>
+    <meta
+      name="description"
+      content="Minimal wasm-pack demo for scatter, line, bar, heatmap, rooted tree, and network plots."
+    />
+    <link rel="stylesheet" href="./style.css" />
+    <script type="module" src="./main.js"></script>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <p class="eyebrow">Navi WASM demo</p>
+        <h1>Six chart types in Rust + WASM</h1>
+        <p class="lede">
+          Scatter, line, bar, heatmap, rooted tree, and network/DAG — all
+          rendered on HTML5 Canvas via Rust and WebAssembly. Drag pannable
+          canvases to pan, click elements to inspect their properties.
+        </p>
+      </section>
+
+      <section class="status-panel" id="status-panel" aria-live="polite">
+        <p class="status-title">Loading wasm package...</p>
+        <p class="status-body">
+          If the package is missing, build it from the workspace root with
+          <code>wasm-pack build crates/navi_plot_wasm --target web --out-dir ../../pkg</code>.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <div class="card-head">
+            <h2>Scatter plot</h2>
+            <p>Drag to pan the current range. Click a point to inspect it. Use the stress buttons for larger loads.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Selection follows the Rust hit-test, not DOM overlays.</p>
+            <div class="button-row">
+              <button class="stress-button" data-stress-count="10000" type="button">Load 10k</button>
+              <button class="stress-button" data-stress-count="100000" type="button">Load 100k</button>
+              <button class="stress-button" data-stress-count="1000000" type="button">Load 1M</button>
+              <button class="reset-button" id="scatter-reset" type="button">Reset view</button>
+            </div>
+          </div>
+          <p class="metrics-strip" id="scatter-metrics">Waiting for first scatter render.</p>
+          <canvas id="scatter-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="scatter-details" aria-live="polite"></section>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Line / time-series</h2>
+            <p>Drag to pan the axis range. Click a point to inspect it.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Multi-series with automatic color palette.</p>
+            <button class="reset-button" id="line-reset" type="button">Reset view</button>
+          </div>
+          <canvas id="line-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="line-details" aria-live="polite"></section>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Bar chart</h2>
+            <p>Click a bar to inspect it. Toggle between grouped and stacked variants.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Categorical x-axis drawn in Rust.</p>
+            <div class="button-row">
+              <button class="variant-button" id="bar-grouped" type="button">Grouped</button>
+              <button class="variant-button" id="bar-stacked" type="button">Stacked</button>
+              <button class="reset-button" id="bar-reset" type="button">Reset</button>
+            </div>
+          </div>
+          <canvas id="bar-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="bar-details" aria-live="polite"></section>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Heatmap</h2>
+            <p>Click a cell to inspect its value. Toggle palette.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Color scale legend rendered in Rust.</p>
+            <div class="button-row">
+              <button class="variant-button" id="heatmap-bwr" type="button">Blue-White-Red</button>
+              <button class="variant-button" id="heatmap-viridis" type="button">Viridis</button>
+              <button class="variant-button" id="heatmap-greens" type="button">Greens</button>
+            </div>
+          </div>
+          <canvas id="heatmap-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="heatmap-details" aria-live="polite"></section>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Rooted tree</h2>
+            <p>Drag to move the tree canvas. Click a node to inspect it.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Node labels stay bound to the canvas selection state.</p>
+            <div class="button-row">
+              <a href="./tree/" class="reset-button" style="text-decoration:none">Open full demo ↗</a>
+              <button class="reset-button" id="tree-reset" type="button">Reset view</button>
+            </div>
+          </div>
+          <canvas id="tree-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="tree-details" aria-live="polite"></section>
+        </article>
+
+        <article class="card">
+          <div class="card-head">
+            <h2>Network / DAG</h2>
+            <p>Drag to pan. Click a node to inspect it. Layout uses Fruchterman-Reingold.</p>
+          </div>
+          <div class="card-toolbar">
+            <p class="hint">Cycles and multi-parent edges are supported.</p>
+            <button class="reset-button" id="network-reset" type="button">Reset view</button>
+          </div>
+          <canvas id="network-canvas" width="720" height="420"></canvas>
+          <section class="details-panel" id="network-details" aria-live="polite"></section>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

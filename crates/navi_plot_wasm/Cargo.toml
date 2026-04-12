@@ -1,0 +1,23 @@
+[package]
+name = "navi_plot_wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Canvas-based Rust/WASM plotting for rooted trees and scatter plots"
+license-file = "../../LICENSE"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+js-sys = "0.3"
+navi_plot_core = { path = "../navi_plot_core" }
+plotters = "0.3"
+plotters-canvas = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+web-sys = { version = "0.3", features = ["Document", "Element", "HtmlCanvasElement", "Window"] }

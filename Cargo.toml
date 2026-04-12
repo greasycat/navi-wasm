@@ -1,0 +1,9 @@
+[workspace]
+members = ["crates/navi_plot_core", "crates/navi_plot_wasm", "crates/server"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+version = "0.1.0"
+

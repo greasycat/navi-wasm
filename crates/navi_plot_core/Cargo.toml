@@ -1,0 +1,12 @@
+[package]
+name = "navi_plot_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+petgraph = "0.8.3"
+plotters = "0.3.7"
+plotters-svg = "0.3.7"
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "2.0"

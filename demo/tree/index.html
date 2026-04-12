@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Rooted tree — Navi WASM</title>
+    <meta name="description" content="Interactive rooted-tree demo: pan, click to select, live-edit layout parameters and node shapes." />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="./tree.css" />
+    <script type="module" src="./tree.js"></script>
+  </head>
+  <body>
+    <main class="page tree-page">
+
+      <header class="tree-header">
+        <a href="../" class="back-link">← All charts</a>
+        <div class="tree-hero">
+          <p class="eyebrow">Navi WASM — rooted tree</p>
+          <h1>Tree explorer</h1>
+          <p class="lede">
+            Drag to pan · click a node to inspect it · adjust every layout
+            parameter live on the right.
+          </p>
+        </div>
+      </header>
+
+      <section class="status-panel" id="status-panel" aria-live="polite">
+        <p class="status-title">Loading WASM…</p>
+        <p class="status-body">
+          If the package is missing, run
+          <code>just build</code> from the workspace root.
+        </p>
+      </section>
+
+      <div class="tree-layout">
+
+        <!-- ── Canvas column ─────────────────────────────────────────── -->
+        <div class="tree-canvas-col">
+          <div class="card canvas-card">
+            <canvas id="tree-canvas" width="820" height="540"></canvas>
+          </div>
+        </div>
+
+        <!-- ── Sidebar ───────────────────────────────────────────────── -->
+        <aside class="tree-sidebar">
+
+          <div class="card ctrl-card">
+
+            <section class="ctrl-section">
+              <h3 class="ctrl-heading">Example tree</h3>
+              <select id="example-select" class="ctrl-select">
+                <option value="org">Engineering org chart</option>
+                <option value="fs">File system</option>
+                <option value="deps">Package dependencies</option>
+              </select>
+            </section>
+
+            <section class="ctrl-section">
+              <h3 class="ctrl-heading">Layout</h3>
+
+              <label class="ctrl-label">
+                Node radius
+                <div class="slider-row">
+                  <input type="range" id="node-radius" min="10" max="40" value="20" />
+                  <span id="node-radius-val" class="slider-val">20</span>
+                </div>
+              </label>
+
+              <label class="ctrl-label">
+                Level gap
+                <div class="slider-row">
+                  <input type="range" id="level-gap" min="40" max="180" value="100" />
+                  <span id="level-gap-val" class="slider-val">100</span>
+                </div>
+              </label>
+
+              <label class="ctrl-label">
+                Sibling gap
+                <div class="slider-row">
+                  <input type="range" id="sibling-gap" min="20" max="140" value="52" />
+                  <span id="sibling-gap-val" class="slider-val">52</span>
+                </div>
+              </label>
+            </section>
+
+            <section class="ctrl-section">
+              <h3 class="ctrl-heading">Node shape</h3>
+              <p class="hint">Override all nodes, or use per-node defaults.</p>
+              <div class="shape-picker" id="shape-picker">
+                <button class="shape-btn active" data-shape="auto" type="button">Auto</button>
+                <button class="shape-btn" data-shape="circle" type="button">
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <circle cx="7" cy="7" r="6" fill="currentColor"/>
+                  </svg>
+                  Circle
+                </button>
+                <button class="shape-btn" data-shape="square" type="button">
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <rect x="1" y="1" width="12" height="12" fill="currentColor"/>
+                  </svg>
+                  Square
+                </button>
+                <button class="shape-btn" data-shape="diamond" type="button">
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <polygon points="7,1 13,7 7,13 1,7" fill="currentColor"/>
+                  </svg>
+                  Diamond
+                </button>
+                <button class="shape-btn" data-shape="triangle" type="button">
+                  <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+                    <polygon points="7,1 13,13 1,13" fill="currentColor"/>
+                  </svg>
+                  Triangle
+                </button>
+              </div>
+            </section>
+
+            <section class="ctrl-section">
+              <h3 class="ctrl-heading">Options</h3>
+              <label class="ctrl-label">
+                Pixel ratio
+                <div class="slider-row">
+                  <input type="range" id="pixel-ratio" min="0.5" max="4" step="0.5" value="1" />
+                  <span id="pixel-ratio-val" class="slider-val">1×</span>
+                </div>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="label-inside" />
+                Label inside node (white text)
+              </label>
+            </section>
+
+            <button class="reset-button full-width" id="tree-reset" type="button">
+              Reset view
+            </button>
+
+          </div><!-- /ctrl-card -->
+
+          <div class="card details-card" id="tree-details" aria-live="polite">
+            <p class="details-empty-copy">Click a node to inspect it.</p>
+          </div>
+
+        </aside><!-- /tree-sidebar -->
+
+      </div><!-- /tree-layout -->
+
+    </main>
+  </body>
+</html>
