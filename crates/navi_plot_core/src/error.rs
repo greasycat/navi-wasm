@@ -39,6 +39,8 @@ pub enum PlotError {
     DuplicateEdge { from_node: String, to_node: String },
     #[error("tree edge references unknown node `{node_id}`")]
     UnknownNode { node_id: String },
+    #[error("network path edge `{from_node}` -> `{to_node}` does not exist")]
+    InvalidNetworkPath { from_node: String, to_node: String },
     #[error("tree must contain exactly one root, found {count}")]
     InvalidRootCount { count: usize },
     #[error("declared root `{declared_root}` does not match the unique root `{actual_root}`")]
@@ -121,6 +123,7 @@ impl PlotError {
             Self::DuplicateNodeId { .. } => "DUPLICATE_NODE_ID",
             Self::DuplicateEdge { .. } => "DUPLICATE_EDGE",
             Self::UnknownNode { .. } => "UNKNOWN_NODE",
+            Self::InvalidNetworkPath { .. } => "INVALID_NETWORK_PATH",
             Self::InvalidRootCount { .. } => "INVALID_ROOT_COUNT",
             Self::RootMismatch { .. } => "ROOT_MISMATCH",
             Self::InvalidParentCount { .. } => "INVALID_PARENT_COUNT",

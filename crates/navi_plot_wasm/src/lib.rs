@@ -1262,6 +1262,46 @@ mod wasm_impl {
         })
     }
 
+    pub fn set_network_tracking_path_session(
+        handle: u32,
+        node_ids: JsValue,
+    ) -> Result<(), JsValue> {
+        let node_ids: Vec<String> = from_value(node_ids).map_err(js_error)?;
+        with_network_session_mut(handle, |entry| {
+            entry
+                .session
+                .set_tracking_path(node_ids)
+                .map_err(plot_error_to_js)
+        })
+    }
+
+    pub fn set_network_tracking_progress_session(
+        handle: u32,
+        progress: f64,
+    ) -> Result<(), JsValue> {
+        with_network_session_mut(handle, |entry| {
+            entry.session.set_tracking_progress(progress);
+            Ok(())
+        })
+    }
+
+    pub fn set_network_tracking_breath_phase_session(
+        handle: u32,
+        phase: f64,
+    ) -> Result<(), JsValue> {
+        with_network_session_mut(handle, |entry| {
+            entry.session.set_tracking_breath_phase(phase);
+            Ok(())
+        })
+    }
+
+    pub fn clear_network_tracking_path_session(handle: u32) -> Result<(), JsValue> {
+        with_network_session_mut(handle, |entry| {
+            entry.session.clear_tracking_path();
+            Ok(())
+        })
+    }
+
     pub fn get_network_view_session(handle: u32) -> Result<JsValue, JsValue> {
         with_network_session_mut(handle, |entry| to_js_value(&entry.session.view()))
     }
@@ -2117,6 +2157,39 @@ pub fn set_network_selection(
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen::prelude::wasm_bindgen]
+pub fn set_network_tracking_path_session(
+    handle: u32,
+    node_ids: wasm_bindgen::JsValue,
+) -> Result<(), wasm_bindgen::JsValue> {
+    wasm_impl::set_network_tracking_path_session(handle, node_ids)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn set_network_tracking_progress_session(
+    handle: u32,
+    progress: f64,
+) -> Result<(), wasm_bindgen::JsValue> {
+    wasm_impl::set_network_tracking_progress_session(handle, progress)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn set_network_tracking_breath_phase_session(
+    handle: u32,
+    phase: f64,
+) -> Result<(), wasm_bindgen::JsValue> {
+    wasm_impl::set_network_tracking_breath_phase_session(handle, phase)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
+pub fn clear_network_tracking_path_session(handle: u32) -> Result<(), wasm_bindgen::JsValue> {
+    wasm_impl::clear_network_tracking_path_session(handle)
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen::prelude::wasm_bindgen]
 pub fn get_network_view_session(
     handle: u32,
 ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue> {
@@ -2440,6 +2513,31 @@ pub fn set_network_selection(
     _handle: u32,
     _node_id: Option<String>,
 ) -> Result<(), wasm_bindgen::JsValue> {
+    Err(unsupported())
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_network_tracking_path_session(
+    _handle: u32,
+    _node_ids: wasm_bindgen::JsValue,
+) -> Result<(), wasm_bindgen::JsValue> {
+    Err(unsupported())
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_network_tracking_progress_session(
+    _handle: u32,
+    _progress: f64,
+) -> Result<(), wasm_bindgen::JsValue> {
+    Err(unsupported())
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_network_tracking_breath_phase_session(
+    _handle: u32,
+    _phase: f64,
+) -> Result<(), wasm_bindgen::JsValue> {
+    Err(unsupported())
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn clear_network_tracking_path_session(_handle: u32) -> Result<(), wasm_bindgen::JsValue> {
     Err(unsupported())
 }
 #[cfg(not(target_arch = "wasm32"))]
