@@ -63,6 +63,17 @@ pub struct TreePlotSpec {
     pub edges: Vec<TreeEdge>,
     #[serde(default = "default_tree_node_radius")]
     pub node_radius: u32,
+    /// Graph-level node style defaults. Per-node legacy fields and per-node
+    /// style overrides still take precedence when provided.
+    #[serde(default)]
+    pub default_node_style: Option<GraphNodeStyle>,
+    /// Graph-level edge style defaults. Per-edge style overrides still take
+    /// precedence when provided.
+    #[serde(default)]
+    pub default_edge_style: Option<GraphEdgeStyle>,
+    /// Selection ring styling for the currently selected node.
+    #[serde(default)]
+    pub selection_style: Option<SelectionStyle>,
     #[serde(default = "default_tree_level_gap")]
     pub level_gap: u32,
     #[serde(default = "default_tree_sibling_gap")]
@@ -75,6 +86,9 @@ pub struct TreePlotSpec {
     pub offset_y: i32,
     #[serde(default)]
     pub selected_node_id: Option<String>,
+    /// Node IDs whose descendants should be hidden and removed from layout.
+    #[serde(default)]
+    pub collapsed_node_ids: Vec<String>,
     /// Device pixel ratio used to scale fonts for HiDPI canvases. Default: 1.0.
     /// Set to `window.devicePixelRatio` in JS and multiply `width`, `height`,
     /// `margin`, `node_radius`, `level_gap`, and `sibling_gap` by the same factor.
@@ -97,6 +111,142 @@ pub enum NodeShape {
     Triangle,
 }
 
+/// Built-in icon set for tree and network nodes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum BuiltinNodeIcon {
+    Star,
+    Galaxy,
+    Planet,
+    Moon,
+    Telescope,
+    Camera,
+    Alert,
+    Archive,
+    Database,
+    Broker,
+    Dish,
+    Spectrograph,
+}
+
+/// Scaling mode for node images inside the node shape bounds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum NodeMediaFit {
+    #[default]
+    Contain,
+    Cover,
+}
+
+/// Discriminant for node media content.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum NodeMediaKind {
+    Icon,
+    Image,
+}
+
+/// Optional icon or registered image content rendered inside a node.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NodeMedia {
+    pub kind: NodeMediaKind,
+    /// Built-in icon name. Required when `kind == "icon"`.
+    #[serde(default)]
+    pub icon: Option<BuiltinNodeIcon>,
+    /// Registered image key. Required when `kind == "image"`.
+    #[serde(default)]
+    pub image_key: Option<String>,
+    /// Image sizing mode inside the node bounds. Default: `contain`.
+    #[serde(default)]
+    pub fit: NodeMediaFit,
+    /// Relative media size within the node. Valid range: `0.2..=1.0`.
+    #[serde(default)]
+    pub scale: Option<f64>,
+    /// Media tint color. Used by built-in icons. Default: white.
+    #[serde(default)]
+    pub tint_color: Option<String>,
+    /// Built-in icon shown when an image is unavailable.
+    #[serde(default)]
+    pub fallback_icon: Option<BuiltinNodeIcon>,
+}
+
+/// Shared style overrides for tree and network graph nodes.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct GraphNodeStyle {
+    /// Node fill color. CSS hex (e.g. `"#3b82f6"`).
+    #[serde(default)]
+    pub fill_color: Option<String>,
+    /// Optional outline color. Defaults to the fill color when `stroke_width`
+    /// is set but `stroke_color` is omitted.
+    #[serde(default)]
+    pub stroke_color: Option<String>,
+    /// Outline width in pixels. `0` disables the outline. Default: `0`.
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    /// Node radius in canvas pixels. Must be at least `1`.
+    #[serde(default)]
+    pub radius: Option<f64>,
+    /// Opacity applied to the node fill, outline, and label. `0..=1`.
+    #[serde(default)]
+    pub opacity: Option<f64>,
+    /// Shape override for the node.
+    #[serde(default)]
+    pub shape: Option<NodeShape>,
+    /// Controls whether the label is drawn for this node. Default: inherited.
+    #[serde(default)]
+    pub label_visible: Option<bool>,
+    /// Label text color. Defaults to white for inside labels and black for
+    /// labels rendered outside the node.
+    #[serde(default)]
+    pub label_color: Option<String>,
+    /// Render the label centered inside the node shape instead of below it.
+    #[serde(default)]
+    pub label_inside: Option<bool>,
+}
+
+/// Shared style overrides for tree and network graph edges.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct GraphEdgeStyle {
+    /// Edge stroke color. CSS hex (e.g. `"#64748b"`).
+    #[serde(default)]
+    pub stroke_color: Option<String>,
+    /// Edge stroke width in pixels. `0` hides the line.
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    /// Alternating draw / gap lengths in pixels, e.g. `[6, 4]` for dashed lines.
+    #[serde(default)]
+    pub dash_pattern: Option<Vec<f64>>,
+    /// Opacity applied to the edge stroke, arrowhead, and label. `0..=1`.
+    #[serde(default)]
+    pub opacity: Option<f64>,
+    /// Override arrowhead visibility. Ignored for trees.
+    #[serde(default)]
+    pub arrow_visible: Option<bool>,
+    /// Controls whether the edge label is drawn when one exists.
+    #[serde(default)]
+    pub label_visible: Option<bool>,
+    /// Edge label text color. Defaults to the resolved stroke color.
+    #[serde(default)]
+    pub label_color: Option<String>,
+}
+
+/// Style overrides for the selected-node ring used by tree and network graphs.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct SelectionStyle {
+    /// Selection ring stroke color. CSS hex.
+    #[serde(default)]
+    pub stroke_color: Option<String>,
+    /// Selection ring stroke width in pixels. `0` hides the ring.
+    #[serde(default)]
+    pub stroke_width: Option<f64>,
+    /// Extra padding between the node radius and the selection ring radius.
+    #[serde(default)]
+    pub padding: Option<f64>,
+    /// Opacity applied to the selection ring. `0..=1`.
+    #[serde(default)]
+    pub opacity: Option<f64>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct TreeNode {
     pub id: String,
@@ -105,12 +255,19 @@ pub struct TreeNode {
     pub label: String,
     #[serde(default)]
     pub color: Option<String>,
-    /// Shape of the node. Default: `"circle"`.
+    /// Shape of the node. When omitted, inherits from `default_node_style` or
+    /// falls back to `"circle"`.
     #[serde(default)]
-    pub shape: NodeShape,
-    /// Render the label inside the node shape instead of below it. Default: `false`.
+    pub shape: Option<NodeShape>,
+    /// Render the label inside the node shape instead of below it.
     #[serde(default)]
-    pub label_inside: bool,
+    pub label_inside: Option<bool>,
+    /// Per-node style overrides.
+    #[serde(default)]
+    pub style: Option<GraphNodeStyle>,
+    /// Optional icon or registered image rendered inside the node.
+    #[serde(default)]
+    pub media: Option<NodeMedia>,
     #[serde(default)]
     pub properties: BTreeMap<String, String>,
 }
@@ -119,6 +276,9 @@ pub struct TreeNode {
 pub struct TreeEdge {
     pub source: String,
     pub target: String,
+    /// Per-edge style overrides.
+    #[serde(default)]
+    pub style: Option<GraphEdgeStyle>,
 }
 
 fn default_tree_node_radius() -> u32 {
@@ -327,6 +487,17 @@ pub struct NetworkPlotSpec {
     /// Node circle radius in pixels. Default: 16.
     #[serde(default = "default_network_node_radius")]
     pub node_radius: u32,
+    /// Graph-level node style defaults. Per-node legacy fields and per-node
+    /// style overrides still take precedence when provided.
+    #[serde(default)]
+    pub default_node_style: Option<GraphNodeStyle>,
+    /// Graph-level edge style defaults. Per-edge legacy fields and per-edge
+    /// style overrides still take precedence when provided.
+    #[serde(default)]
+    pub default_edge_style: Option<GraphEdgeStyle>,
+    /// Selection ring styling for the currently selected node.
+    #[serde(default)]
+    pub selection_style: Option<SelectionStyle>,
     /// Margin around the drawable area. Default: 40.
     #[serde(default = "default_network_margin")]
     pub margin: u32,
@@ -352,6 +523,37 @@ pub struct NetworkPlotSpec {
     pub pixel_ratio: f64,
 }
 
+/// Camera state for a network graph session.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NetworkView {
+    /// Screen zoom factor. `1.0` means one world unit equals one screen pixel.
+    pub zoom: f64,
+    /// Screen-space translation in pixels.
+    pub translate_x: f64,
+    /// Screen-space translation in pixels.
+    pub translate_y: f64,
+}
+
+/// Focus behavior for computing a target camera view.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct NetworkFocusOptions {
+    #[serde(default)]
+    pub mode: NetworkFocusMode,
+    /// Screen padding in pixels around the focus bounds.
+    #[serde(default = "default_network_focus_padding")]
+    pub padding: f64,
+    /// Minimum world-space span to keep isolated nodes from over-zooming.
+    #[serde(default = "default_network_focus_min_world_span")]
+    pub min_world_span: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkFocusMode {
+    #[default]
+    NodeAndNeighbors,
+}
+
 /// A node in a [`NetworkPlotSpec`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct NetworkNode {
@@ -371,12 +573,19 @@ pub struct NetworkNode {
     /// Explicit canvas-relative y coordinate (pixels, 0..height). See `x`.
     #[serde(default)]
     pub y: Option<f64>,
-    /// Shape of the node. Default: `"circle"`.
+    /// Shape of the node. When omitted, inherits from `default_node_style` or
+    /// falls back to `"circle"`.
     #[serde(default)]
-    pub shape: NodeShape,
-    /// Render the label inside the node shape instead of below it. Default: `false`.
+    pub shape: Option<NodeShape>,
+    /// Render the label inside the node shape instead of below it.
     #[serde(default)]
-    pub label_inside: bool,
+    pub label_inside: Option<bool>,
+    /// Per-node style overrides.
+    #[serde(default)]
+    pub style: Option<GraphNodeStyle>,
+    /// Optional icon or registered image rendered inside the node.
+    #[serde(default)]
+    pub media: Option<NodeMedia>,
     #[serde(default)]
     pub properties: BTreeMap<String, String>,
 }
@@ -394,6 +603,9 @@ pub struct NetworkEdge {
     pub color: Option<String>,
     #[serde(default)]
     pub weight: Option<f64>,
+    /// Per-edge style overrides.
+    #[serde(default)]
+    pub style: Option<GraphEdgeStyle>,
 }
 
 fn default_network_node_radius() -> u32 {
@@ -410,4 +622,12 @@ fn default_fr_iterations() -> u32 {
 
 pub(crate) fn default_pixel_ratio() -> f64 {
     1.0
+}
+
+fn default_network_focus_padding() -> f64 {
+    48.0
+}
+
+fn default_network_focus_min_world_span() -> f64 {
+    160.0
 }

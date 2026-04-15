@@ -9,7 +9,7 @@
     <title>Navi WASM Demo</title>
     <meta
       name="description"
-      content="Minimal wasm-pack demo for scatter, line, bar, heatmap, rooted tree, and network plots."
+      content="Minimal wasm-pack demo for scatter, line, bar, heatmap, rooted tree, network plots, and a level-ordered tree explorer."
     />
     <link rel="stylesheet" href="./style.css" />
     <script type="module" src="./main.js"></script>
@@ -20,9 +20,11 @@
         <p class="eyebrow">Navi WASM demo</p>
         <h1>Six chart types in Rust + WASM</h1>
         <p class="lede">
-          Scatter, line, bar, heatmap, rooted tree, and network/DAG — all
-          rendered on HTML5 Canvas via Rust and WebAssembly. Drag pannable
-          canvases to pan, click elements to inspect their properties.
+          Scatter, line, bar, heatmap, rooted tree, and network/DAG all
+          rendered on HTML5 Canvas via Rust and WebAssembly. The two graph
+          explorers now use astronomy-themed datasets to show flexible node and
+          edge styling from the frontend, and the ordered-tree variant keeps
+          sibling sequence explicit across two descendant bands.
         </p>
       </section>
 
@@ -101,15 +103,16 @@
           <section class="details-panel" id="heatmap-details" aria-live="polite"></section>
         </article>
 
-        <article class="card">
+        <article class="card spotlight-card">
           <div class="card-head">
-            <h2>Rooted tree</h2>
-            <p>Drag to move the tree canvas. Click a node to inspect it.</p>
+            <h2>Rooted tree - stellar lineage</h2>
+            <p>Preview a curated stellar-branch explorer, then open the dedicated pages for classic rooted layout or the level-ordered variant.</p>
           </div>
           <div class="card-toolbar">
-            <p class="hint">Node labels stay bound to the canvas selection state.</p>
+            <p class="hint">Per-node shape, outline, order links, and badge overlays are all driven by the same frontend graph data.</p>
             <div class="button-row">
-              <a href="./tree/" class="reset-button" style="text-decoration:none">Open full demo ↗</a>
+              <a href="./tree/" class="card-link">Open tree explorer</a>
+              <a href="./level-ordered-tree/" class="card-link">Open level-ordered tree</a>
               <button class="reset-button" id="tree-reset" type="button">Reset view</button>
             </div>
           </div>
@@ -117,14 +120,17 @@
           <section class="details-panel" id="tree-details" aria-live="polite"></section>
         </article>
 
-        <article class="card">
+        <article class="card spotlight-card">
           <div class="card-head">
-            <h2>Network / DAG</h2>
-            <p>Drag to pan. Click a node to inspect it. Layout uses Fruchterman-Reingold.</p>
+            <h2>Network / DAG - alert mesh</h2>
+            <p>Preview a broker-centered observatory mesh, then open the dedicated page for presets, arrows, and layout rebuilds.</p>
           </div>
           <div class="card-toolbar">
-            <p class="hint">Cycles and multi-parent edges are supported.</p>
-            <button class="reset-button" id="network-reset" type="button">Reset view</button>
+            <p class="hint">Pinned anchors, cycles, and emphasized edges are all available from the frontend graph spec.</p>
+            <div class="button-row">
+              <a href="./network/" class="card-link">Open network explorer</a>
+              <button class="reset-button" id="network-reset" type="button">Reset view</button>
+            </div>
           </div>
           <canvas id="network-canvas" width="720" height="420"></canvas>
           <section class="details-panel" id="network-details" aria-live="polite"></section>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Transit light curve</title>
+  <desc id="desc">Stylized exoplanet transit chart with a central dip and orbital motif.</desc>
+  <defs>
+    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#eff6ff"/>
+      <stop offset="100%" stop-color="#dbeafe"/>
+    </linearGradient>
+    <linearGradient id="curve" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="160" height="160" rx="24" fill="#0f172a"/>
+  <rect x="22" y="32" width="116" height="82" rx="14" fill="url(#panel)"/>
+  <g stroke="#94a3b8" stroke-width="2" opacity="0.7">
+    <path d="M36 96 H126"/>
+    <path d="M40 48 V100"/>
+    <path d="M40 62 H126" opacity="0.35"/>
+    <path d="M40 78 H126" opacity="0.35"/>
+  </g>
+  <path d="M44 58 C60 57 66 58 74 59 C80 60 82 72 88 74 C96 77 106 60 122 58" fill="none" stroke="url(#curve)" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="84" cy="124" r="18" fill="none" stroke="#38bdf8" stroke-width="4" opacity="0.8"/>
+  <circle cx="100" cy="124" r="5" fill="#f59e0b"/>
+  <circle cx="84" cy="124" r="8" fill="#f8fafc"/>
+</svg>

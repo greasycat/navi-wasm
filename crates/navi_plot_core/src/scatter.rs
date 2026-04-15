@@ -105,6 +105,7 @@ impl ScatterSession {
             .draw_series(
                 self.points
                     .iter()
+                    .filter(|point| point_overlaps_plot_area(&self.viewport, point, 0))
                     .filter(|point| !point.label.is_empty())
                     .map(|point| {
                         EmptyElement::at((point.x, point.y))
@@ -123,21 +124,23 @@ impl ScatterSession {
             .filter(|index| *index < self.points.len())
         {
             let point = &self.points[index];
-            chart
-                .draw_series(std::iter::once(
-                    EmptyElement::at((point.x, point.y))
-                        + Circle::new(
-                            (0, 0),
-                            point.radius + SELECTION_RING_PADDING,
-                            ShapeStyle::from(&BLACK.mix(0.9)).stroke_width(2),
-                        )
-                        + Text::new(
-                            point.name.clone(),
-                            (point.radius + 10, point.radius + 16),
-                            ("sans-serif", 13).into_font().color(&BLACK),
-                        ),
-                ))
-                .map_err(backend_error)?;
+            if point_overlaps_plot_area(&self.viewport, point, SELECTION_RING_PADDING) {
+                chart
+                    .draw_series(std::iter::once(
+                        EmptyElement::at((point.x, point.y))
+                            + Circle::new(
+                                (0, 0),
+                                point.radius + SELECTION_RING_PADDING,
+                                ShapeStyle::from(&BLACK.mix(0.9)).stroke_width(2),
+                            )
+                            + Text::new(
+                                point.name.clone(),
+                                (point.radius + 10, point.radius + 16),
+                                ("sans-serif", 13).into_font().color(&BLACK),
+                            ),
+                    ))
+                    .map_err(backend_error)?;
+            }
         }
 
         root.present().map_err(backend_error)?;
@@ -154,6 +157,9 @@ impl ScatterSession {
             .iter()
             .enumerate()
             .filter_map(|(index, point)| {
+                if !point_overlaps_plot_area(&self.viewport, point, SELECTION_RING_PADDING) {
+                    return None;
+                }
                 let center = self.viewport.translate((point.x, point.y));
                 let dx = f64::from(center.0 - target.0);
                 let dy = f64::from(center.1 - target.1);
@@ -198,6 +204,13 @@ impl ScatterSession {
         self.spec.y_range = Some([next_y.0, next_y.1]);
     }
 
+    pub fn zoom_at(&mut self, canvas_x: f64, canvas_y: f64, factor: f64) -> Result<(), PlotError> {
+        self.viewport.zoom_at(canvas_x, canvas_y, factor)?;
+        self.spec.x_range = Some([self.viewport.x_range.0, self.viewport.x_range.1]);
+        self.spec.y_range = Some([self.viewport.y_range.0, self.viewport.y_range.1]);
+        Ok(())
+    }
+
     pub fn set_selection(&mut self, index: Option<usize>) {
         self.spec.selected_point_index = index.filter(|index| *index < self.points.len());
     }
@@ -221,6 +234,17 @@ impl ScatterSession {
     pub fn into_spec(self) -> ScatterPlotSpec {
         self.spec
     }
+}
+
+fn point_overlaps_plot_area(
+    viewport: &CartesianViewport,
+    point: &ResolvedPoint,
+    extra_radius: i32,
+) -> bool {
+    let center = viewport.translate((point.x, point.y));
+    viewport
+        .plot_bounds
+        .intersects_circle(center, point.radius.max(1) + extra_radius.max(0))
 }
 
 pub fn render_scatter_on<DB>(root: PlotArea<DB>, spec: &ScatterPlotSpec) -> Result<(), PlotError>
@@ -344,7 +368,6 @@ fn y_axis_label(spec: &ScatterPlotSpec) -> &str {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -448,6 +471,20 @@ mod tests {
         let selected = session.pick_point(f64::from(target.0), f64::from(target.1));
 
         assert_eq!(selected, Some(1));
+    }
+
+    #[test]
+    fn scatter_hit_test_ignores_offscreen_points() {
+        let mut spec = sample_spec();
+        spec.x_range = Some([-1.0, 1.0]);
+        spec.y_range = Some([-1.0, 1.0]);
+
+        let session = ScatterSession::new(spec).unwrap();
+        let target = session.viewport.translate((4.0, -1.5));
+
+        let selected = session.pick_point(f64::from(target.0), f64::from(target.1));
+
+        assert_eq!(selected, None);
     }
 
     #[test]

@@ -18,6 +18,19 @@ pub enum PlotError {
     },
     #[error("invalid color `{color}`")]
     InvalidColor { color: String },
+    #[error("invalid style field `{field}`: {reason} (got {value})")]
+    InvalidStyleValue {
+        field: &'static str,
+        value: f64,
+        reason: &'static str,
+    },
+    #[error("invalid zoom factor `{factor}`: must be finite and greater than zero")]
+    InvalidZoomFactor { factor: f64 },
+    #[error("invalid node media field `{field}`: {reason}")]
+    InvalidNodeMedia {
+        field: &'static str,
+        reason: &'static str,
+    },
     #[error("tree root `{root_id}` was not found in the node set")]
     MissingRoot { root_id: String },
     #[error("duplicate tree node id `{node_id}`")]
@@ -95,31 +108,34 @@ impl PlotError {
     /// ```
     pub fn code(&self) -> &'static str {
         match self {
-            Self::InvalidDimensions { .. }       => "INVALID_DIMENSIONS",
-            Self::EmptyScatterData               => "EMPTY_SCATTER_DATA",
-            Self::EmptyTree                      => "EMPTY_TREE",
-            Self::NonFinitePointValue { .. }     => "NON_FINITE_POINT_VALUE",
-            Self::InvalidRange { .. }            => "INVALID_RANGE",
-            Self::InvalidColor { .. }            => "INVALID_COLOR",
-            Self::MissingRoot { .. }             => "MISSING_ROOT",
-            Self::DuplicateNodeId { .. }         => "DUPLICATE_NODE_ID",
-            Self::DuplicateEdge { .. }           => "DUPLICATE_EDGE",
-            Self::UnknownNode { .. }             => "UNKNOWN_NODE",
-            Self::InvalidRootCount { .. }        => "INVALID_ROOT_COUNT",
-            Self::RootMismatch { .. }            => "ROOT_MISMATCH",
-            Self::InvalidParentCount { .. }      => "INVALID_PARENT_COUNT",
-            Self::CycleDetected                  => "CYCLE_DETECTED",
-            Self::DisconnectedNode { .. }        => "DISCONNECTED_NODE",
-            Self::Backend { .. }                 => "BACKEND_ERROR",
-            Self::EmptyLineSeries                => "EMPTY_LINE_SERIES",
-            Self::EmptySeriesPoints { .. }       => "EMPTY_SERIES_POINTS",
-            Self::EmptyBarCategories             => "EMPTY_BAR_CATEGORIES",
-            Self::EmptyBarSeries                 => "EMPTY_BAR_SERIES",
-            Self::BarValueCountMismatch { .. }   => "BAR_VALUE_COUNT_MISMATCH",
+            Self::InvalidDimensions { .. } => "INVALID_DIMENSIONS",
+            Self::EmptyScatterData => "EMPTY_SCATTER_DATA",
+            Self::EmptyTree => "EMPTY_TREE",
+            Self::NonFinitePointValue { .. } => "NON_FINITE_POINT_VALUE",
+            Self::InvalidRange { .. } => "INVALID_RANGE",
+            Self::InvalidColor { .. } => "INVALID_COLOR",
+            Self::InvalidStyleValue { .. } => "INVALID_STYLE_VALUE",
+            Self::InvalidZoomFactor { .. } => "INVALID_ZOOM_FACTOR",
+            Self::InvalidNodeMedia { .. } => "INVALID_NODE_MEDIA",
+            Self::MissingRoot { .. } => "MISSING_ROOT",
+            Self::DuplicateNodeId { .. } => "DUPLICATE_NODE_ID",
+            Self::DuplicateEdge { .. } => "DUPLICATE_EDGE",
+            Self::UnknownNode { .. } => "UNKNOWN_NODE",
+            Self::InvalidRootCount { .. } => "INVALID_ROOT_COUNT",
+            Self::RootMismatch { .. } => "ROOT_MISMATCH",
+            Self::InvalidParentCount { .. } => "INVALID_PARENT_COUNT",
+            Self::CycleDetected => "CYCLE_DETECTED",
+            Self::DisconnectedNode { .. } => "DISCONNECTED_NODE",
+            Self::Backend { .. } => "BACKEND_ERROR",
+            Self::EmptyLineSeries => "EMPTY_LINE_SERIES",
+            Self::EmptySeriesPoints { .. } => "EMPTY_SERIES_POINTS",
+            Self::EmptyBarCategories => "EMPTY_BAR_CATEGORIES",
+            Self::EmptyBarSeries => "EMPTY_BAR_SERIES",
+            Self::BarValueCountMismatch { .. } => "BAR_VALUE_COUNT_MISMATCH",
             Self::NegativeStackedBarValue { .. } => "NEGATIVE_STACKED_BAR_VALUE",
-            Self::EmptyHeatmapData               => "EMPTY_HEATMAP_DATA",
-            Self::HeatmapShapeMismatch { .. }    => "HEATMAP_SHAPE_MISMATCH",
-            Self::EmptyNetwork                   => "EMPTY_NETWORK",
+            Self::EmptyHeatmapData => "EMPTY_HEATMAP_DATA",
+            Self::HeatmapShapeMismatch { .. } => "HEATMAP_SHAPE_MISMATCH",
+            Self::EmptyNetwork => "EMPTY_NETWORK",
         }
     }
 }

@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Level-Ordered Tree | Navi WASM</title>
+    <meta
+      name="description"
+      content="Pinned ordered-tree explorer for rooted handoff flows, with same-level links and order badges powered by Navi WASM."
+    />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../explorer.css" />
+    <link rel="stylesheet" href="./level-ordered-tree.css" />
+    <script type="module" src="./level-ordered-tree.js"></script>
+  </head>
+  <body class="explorer-body explorer-level-ordered-tree">
+    <main class="page explorer-page">
+      <header class="explorer-topbar">
+        <a href="../" class="back-link">Back to all demos</a>
+        <p class="explorer-label">Navi WASM level-ordered tree</p>
+      </header>
+
+      <section class="explorer-intro">
+        <div class="intro-copy">
+          <p class="eyebrow">Ordered hierarchy</p>
+          <h1>Level-ordered tree</h1>
+          <p class="lede">
+            Keep a rooted flow while preserving left-to-right order across each
+            descendant band. The root stays fixed, sibling order stays explicit,
+            and image or icon nodes still render from the same graph spec.
+          </p>
+          <div class="chip-row" id="scenario-buttons" aria-label="Ordered tree scenarios">
+            <button class="chip-button" data-scenario="handoff" type="button">Night flow</button>
+            <button class="chip-button" data-scenario="astrobook" type="button">Astrobook</button>
+          </div>
+        </div>
+
+        <figure class="hero-figure">
+          <img
+            src="https://images.unsplash.com/photo-1534796636912-3b95b3ab5986?auto=format&fit=crop&w=1200&q=80"
+            alt="Dense stars scattered across a dark night sky."
+          />
+          <figcaption>Reference image from Unsplash.</figcaption>
+        </figure>
+      </section>
+
+      <section class="status-panel" id="status-panel" aria-live="polite">
+        <p class="status-title">Loading WASM...</p>
+        <p class="status-body">
+          If the package is missing, run <code>just build</code> from the workspace root.
+        </p>
+      </section>
+
+      <section class="explorer-grid">
+        <section class="explorer-stage">
+          <div class="stage-header">
+            <div>
+              <p class="stage-kicker" id="ordered-tree-kicker">Two ordered descendant bands</p>
+              <h2 id="ordered-tree-title">Night follow-up order</h2>
+              <p class="stage-summary" id="ordered-tree-summary">
+                Loading the ordered hierarchy.
+              </p>
+            </div>
+
+            <div class="stage-actions">
+              <div class="segmented" id="preset-buttons" aria-label="Appearance presets">
+                <button data-preset="relay" type="button">Relay</button>
+                <button data-preset="ember" type="button">Ember</button>
+                <button data-preset="quiet" type="button">Quiet</button>
+              </div>
+              <button class="explorer-button" id="ordered-tree-reset" type="button">Reset view</button>
+            </div>
+          </div>
+
+          <div class="stats-row" id="ordered-tree-stats"></div>
+
+          <div class="stage-frame ordered-stage-frame">
+            <canvas id="level-ordered-tree-canvas"></canvas>
+            <div class="order-badge-layer" id="order-badge-layer" aria-hidden="true"></div>
+          </div>
+
+          <div class="stage-footer">
+            <p class="stage-note">
+              Drag to pan. Use the wheel to zoom. Click a node to inspect its
+              order slot, parent branch, and sibling neighbors.
+            </p>
+            <ul class="legend-list" id="ordered-tree-legend"></ul>
+          </div>
+        </section>
+
+        <aside class="explorer-rail">
+          <section class="rail-card">
+            <h3>Order note</h3>
+            <p class="note-copy" id="ordered-tree-note"></p>
+            <div class="info-list" id="ordered-tree-facts"></div>
+          </section>
+
+          <section class="rail-card">
+            <h3>Selection</h3>
+            <div id="ordered-tree-details"></div>
+          </section>
+
+          <details class="rail-card advanced-card">
+            <summary>Advanced controls</summary>
+
+            <label class="field">
+              Scenario
+              <select id="scenario-select">
+                <option value="handoff">Night flow</option>
+                <option value="astrobook">Astrobook</option>
+              </select>
+            </label>
+
+            <label class="field">
+              Node radius
+              <div class="range-row">
+                <input id="node-radius" type="range" min="12" max="28" step="1" />
+                <span class="range-value" id="node-radius-value"></span>
+              </div>
+            </label>
+
+            <label class="field">
+              Edge width
+              <div class="range-row">
+                <input id="edge-width" type="range" min="1" max="6" step="1" />
+                <span class="range-value" id="edge-width-value"></span>
+              </div>
+            </label>
+
+            <label class="field">
+              Pixel ratio
+              <div class="range-row">
+                <input id="pixel-ratio" type="range" min="1" max="3" step="0.5" />
+                <span class="range-value" id="pixel-ratio-value"></span>
+              </div>
+            </label>
+
+            <label class="checkbox-row">
+              <input id="show-order-badges" type="checkbox" />
+              <span>Show order badges</span>
+            </label>
+          </details>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>

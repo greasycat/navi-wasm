@@ -1,554 +1,1606 @@
 import init, * as wasm from "../../pkg/navi_plot_wasm.js";
 
-// ─── Example trees ───────────────────────────────────────────────────────────
-
-const EXAMPLES = {
-  org: {
-    title: "Engineering org chart",
-    root_id: "cto",
-    nodes: [
-      // C-suite
-      { id: "cto",         label: "CTO",        name: "Chief Technology Officer",  shape: "diamond", color: "#0f172a", properties: { level: "C-suite", reports: "4 VPs" } },
-      // VPs — 4 direct reports
-      { id: "vp-eng",      label: "VP Eng",     name: "VP Engineering",            shape: "square",  color: "#2563eb", properties: { level: "VP",     reports: "3 leads" } },
-      { id: "vp-prod",     label: "VP Prod",    name: "VP Product",                shape: "square",  color: "#7c3aed", properties: { level: "VP",     reports: "3 ICs"   } },
-      { id: "vp-data",     label: "VP Data",    name: "VP Data & ML",              shape: "square",  color: "#0891b2", properties: { level: "VP",     reports: "2 leads" } },
-      { id: "vp-sec",      label: "VP Sec",     name: "VP Security",               shape: "square",  color: "#be123c", properties: { level: "VP",     reports: "2 leads" } },
-      // Eng leads — 3 under VP Eng
-      { id: "eng-lead",    label: "Eng Lead",   name: "Engineering Lead",          shape: "square",  color: "#1d4ed8", properties: { level: "Lead",   team: "Platform"     } },
-      { id: "devops-lead", label: "DevOps",     name: "DevOps Lead",               shape: "square",  color: "#1d4ed8", properties: { level: "Lead",   team: "Reliability"  } },
-      { id: "mobile-lead", label: "Mobile",     name: "Mobile Lead",               shape: "square",  color: "#1d4ed8", properties: { level: "Lead",   team: "iOS & Android"} },
-      // Data leads — 2 under VP Data
-      { id: "data-lead",   label: "Data Lead",  name: "Data Engineering Lead",     shape: "square",  color: "#0e7490", properties: { level: "Lead",   team: "Data Platform"} },
-      { id: "ml-lead",     label: "ML Lead",    name: "ML Platform Lead",          shape: "square",  color: "#0e7490", properties: { level: "Lead",   team: "ML Platform"  } },
-      // Sec leads — 2 under VP Sec
-      { id: "appsec-lead", label: "AppSec",     name: "Application Security Lead", shape: "square",  color: "#9f1239", properties: { level: "Lead",   team: "AppSec"       } },
-      { id: "infrasec",    label: "InfraSec",   name: "Infrastructure Security",   shape: "square",  color: "#9f1239", properties: { level: "Lead",   team: "InfraSec"     } },
-      // IC leaves — Platform (3 SWEs)
-      { id: "swe1",        label: "SWE",        name: "Software Engineer I",       shape: "circle",  color: "#60a5fa", properties: { level: "IC4",    lang: "Rust / Go"   } },
-      { id: "swe2",        label: "SWE",        name: "Software Engineer II",      shape: "circle",  color: "#60a5fa", properties: { level: "IC3",    lang: "TypeScript"  } },
-      { id: "swe3",        label: "SWE",        name: "Software Engineer III",     shape: "circle",  color: "#60a5fa", properties: { level: "IC5",    lang: "Rust"        } },
-      // DevOps (2 SREs)
-      { id: "sre1",        label: "SRE",        name: "Site Reliability Eng I",    shape: "circle",  color: "#93c5fd", properties: { level: "IC4",    focus: "Infrastructure"} },
-      { id: "sre2",        label: "SRE",        name: "Site Reliability Eng II",   shape: "circle",  color: "#93c5fd", properties: { level: "IC3",    focus: "Observability" } },
-      // Mobile (3 engineers)
-      { id: "ios",         label: "iOS",        name: "iOS Engineer",              shape: "circle",  color: "#bfdbfe", properties: { level: "IC4",    lang: "Swift"       } },
-      { id: "android",     label: "Android",    name: "Android Engineer",          shape: "circle",  color: "#bfdbfe", properties: { level: "IC4",    lang: "Kotlin"      } },
-      { id: "rn",          label: "React-N",    name: "React Native Engineer",     shape: "circle",  color: "#bfdbfe", properties: { level: "IC3",    lang: "TypeScript"  } },
-      // Product ICs (3 under VP Prod)
-      { id: "pm1",         label: "PM",         name: "Product Manager — Core",    shape: "circle",  color: "#a78bfa", properties: { level: "IC4",    area: "Core"        } },
-      { id: "pm2",         label: "PM",         name: "Product Manager — Growth",  shape: "circle",  color: "#a78bfa", properties: { level: "IC4",    area: "Growth"      } },
-      { id: "designer",    label: "Design",     name: "UX Designer",               shape: "triangle",color: "#c4b5fd", properties: { level: "IC3",    tools: "Figma"      } },
-      // Data (2 under data-lead)
-      { id: "ds1",         label: "DS",         name: "Data Scientist I",          shape: "triangle",color: "#67e8f9", properties: { level: "IC4",    focus: "Experimentation"} },
-      { id: "ds2",         label: "DS",         name: "Data Scientist II",         shape: "triangle",color: "#67e8f9", properties: { level: "IC3",    focus: "Analytics"     } },
-      // ML (2 under ml-lead)
-      { id: "mle1",        label: "MLE",        name: "ML Engineer — Ranking",     shape: "triangle",color: "#a5f3fc", properties: { level: "IC5",    focus: "Ranking models"} },
-      { id: "mle2",        label: "MLE",        name: "ML Engineer — NLP",         shape: "triangle",color: "#a5f3fc", properties: { level: "IC4",    focus: "NLP"           } },
-      // Sec ICs
-      { id: "pen",         label: "PenTest",    name: "Penetration Tester",        shape: "triangle",color: "#fda4af", properties: { level: "IC4",    cert: "OSCP"           } },
-      { id: "seceng",      label: "SecEng",     name: "Security Engineer",         shape: "triangle",color: "#fda4af", properties: { level: "IC4",    focus: "IAM"           } },
-    ],
-    edges: [
-      { source: "cto",         target: "vp-eng"      },
-      { source: "cto",         target: "vp-prod"     },
-      { source: "cto",         target: "vp-data"     },
-      { source: "cto",         target: "vp-sec"      },
-      { source: "vp-eng",      target: "eng-lead"    },
-      { source: "vp-eng",      target: "devops-lead" },
-      { source: "vp-eng",      target: "mobile-lead" },
-      { source: "vp-prod",     target: "pm1"         },
-      { source: "vp-prod",     target: "pm2"         },
-      { source: "vp-prod",     target: "designer"    },
-      { source: "vp-data",     target: "data-lead"   },
-      { source: "vp-data",     target: "ml-lead"     },
-      { source: "vp-sec",      target: "appsec-lead" },
-      { source: "vp-sec",      target: "infrasec"    },
-      { source: "eng-lead",    target: "swe1"        },
-      { source: "eng-lead",    target: "swe2"        },
-      { source: "eng-lead",    target: "swe3"        },
-      { source: "devops-lead", target: "sre1"        },
-      { source: "devops-lead", target: "sre2"        },
-      { source: "mobile-lead", target: "ios"         },
-      { source: "mobile-lead", target: "android"     },
-      { source: "mobile-lead", target: "rn"          },
-      { source: "data-lead",   target: "ds1"         },
-      { source: "data-lead",   target: "ds2"         },
-      { source: "ml-lead",     target: "mle1"        },
-      { source: "ml-lead",     target: "mle2"        },
-      { source: "appsec-lead", target: "pen"         },
-      { source: "appsec-lead", target: "seceng"      },
-    ],
-  },
-
-  fs: {
-    title: "File system snapshot",
-    root_id: "root",
-    nodes: [
-      // Root dirs — 5 children
-      { id: "root",     label: "/",           shape: "square",   color: "#1e293b", properties: { type: "dir",     perms: "rwxr-xr-x" } },
-      { id: "home",     label: "home/",       shape: "square",   color: "#334155", properties: { type: "dir" } },
-      { id: "etc",      label: "etc/",        shape: "square",   color: "#334155", properties: { type: "dir" } },
-      { id: "usr",      label: "usr/",        shape: "square",   color: "#334155", properties: { type: "dir" } },
-      { id: "var",      label: "var/",        shape: "square",   color: "#334155", properties: { type: "dir" } },
-      { id: "tmp",      label: "tmp/",        shape: "square",   color: "#475569", properties: { type: "dir",     perms: "rwxrwxrwx" } },
-      // home — 3 children
-      { id: "bashrc",   label: ".bashrc",     shape: "circle",   color: "#64748b", properties: { type: "file",    size: "4.2 KB"  } },
-      { id: "ssh-dir",  label: ".ssh/",       shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "projects", label: "projects/",   shape: "square",   color: "#475569", properties: { type: "dir" } },
-      // .ssh — 2 files
-      { id: "id-rsa",   label: "id_rsa",      shape: "circle",   color: "#f43f5e", properties: { type: "file",    size: "3.4 KB",  perms: "rw-------" } },
-      { id: "known",    label: "known_hosts", shape: "circle",   color: "#94a3b8", properties: { type: "file",    size: "8.1 KB"  } },
-      // projects — 3 dirs
-      { id: "app",      label: "app/",        shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "data-dir", label: "data/",       shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "scripts",  label: "scripts/",    shape: "square",   color: "#475569", properties: { type: "dir" } },
-      // app — 3 files
-      { id: "main-rs",  label: "main.rs",     shape: "circle",   color: "#f97316", properties: { type: "file",    size: "12.4 KB", lang: "Rust" } },
-      { id: "cargo",    label: "Cargo.toml",  shape: "circle",   color: "#fb923c", properties: { type: "file",    size: "1.1 KB"  } },
-      { id: "readme",   label: "README.md",   shape: "circle",   color: "#94a3b8", properties: { type: "file",    size: "2.8 KB"  } },
-      // data — 2 files
-      { id: "csv",      label: "input.csv",   shape: "circle",   color: "#22c55e", properties: { type: "file",    size: "2.1 MB"  } },
-      { id: "schema",   label: "schema.sql",  shape: "circle",   color: "#4ade80", properties: { type: "file",    size: "14 KB"   } },
-      // scripts — 2 files
-      { id: "deploy",   label: "deploy.sh",   shape: "circle",   color: "#fbbf24", properties: { type: "file",    size: "3.6 KB",  lang: "Bash" } },
-      { id: "lint",     label: "lint.sh",     shape: "circle",   color: "#fbbf24", properties: { type: "file",    size: "900 B",   lang: "Bash" } },
-      // etc — 3 files
-      { id: "hosts",    label: "hosts",       shape: "circle",   color: "#94a3b8", properties: { type: "file",    size: "512 B"   } },
-      { id: "fstab",    label: "fstab",       shape: "circle",   color: "#94a3b8", properties: { type: "file",    size: "1.2 KB"  } },
-      { id: "sudoers",  label: "sudoers",     shape: "circle",   color: "#f87171", properties: { type: "file",    perms: "r--r-----" } },
-      // usr — 3 children
-      { id: "bin",      label: "bin/",        shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "lib",      label: "lib/",        shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "share",    label: "share/",      shape: "square",   color: "#475569", properties: { type: "dir" } },
-      // bin — 3 binaries
-      { id: "python3",  label: "python3",     shape: "triangle", color: "#fbbf24", properties: { type: "binary",  version: "3.12.4" } },
-      { id: "git",      label: "git",         shape: "triangle", color: "#f97316", properties: { type: "binary",  version: "2.44.0" } },
-      { id: "curl",     label: "curl",        shape: "triangle", color: "#94a3b8", properties: { type: "binary",  version: "8.7.1"  } },
-      // lib — 2 libs
-      { id: "libssl",   label: "libssl.so",   shape: "triangle", color: "#94a3b8", properties: { type: "library", version: "3.0.2"  } },
-      { id: "libz",     label: "libz.so",     shape: "triangle", color: "#cbd5e1", properties: { type: "library", version: "1.3.1"  } },
-      // var — 2 children
-      { id: "log",      label: "log/",        shape: "square",   color: "#475569", properties: { type: "dir" } },
-      { id: "spool",    label: "spool/",      shape: "square",   color: "#475569", properties: { type: "dir" } },
-      // log — 3 log files
-      { id: "syslog",   label: "syslog",      shape: "circle",   color: "#64748b", properties: { type: "file",    size: "48 MB"   } },
-      { id: "auth-log", label: "auth.log",    shape: "circle",   color: "#64748b", properties: { type: "file",    size: "12 MB"   } },
-      { id: "kern-log", label: "kern.log",    shape: "circle",   color: "#64748b", properties: { type: "file",    size: "6.2 MB"  } },
-    ],
-    edges: [
-      { source: "root",     target: "home"     },
-      { source: "root",     target: "etc"      },
-      { source: "root",     target: "usr"      },
-      { source: "root",     target: "var"      },
-      { source: "root",     target: "tmp"      },
-      { source: "home",     target: "bashrc"   },
-      { source: "home",     target: "ssh-dir"  },
-      { source: "home",     target: "projects" },
-      { source: "ssh-dir",  target: "id-rsa"   },
-      { source: "ssh-dir",  target: "known"    },
-      { source: "projects", target: "app"      },
-      { source: "projects", target: "data-dir" },
-      { source: "projects", target: "scripts"  },
-      { source: "app",      target: "main-rs"  },
-      { source: "app",      target: "cargo"    },
-      { source: "app",      target: "readme"   },
-      { source: "data-dir", target: "csv"      },
-      { source: "data-dir", target: "schema"   },
-      { source: "scripts",  target: "deploy"   },
-      { source: "scripts",  target: "lint"     },
-      { source: "etc",      target: "hosts"    },
-      { source: "etc",      target: "fstab"    },
-      { source: "etc",      target: "sudoers"  },
-      { source: "usr",      target: "bin"      },
-      { source: "usr",      target: "lib"      },
-      { source: "usr",      target: "share"    },
-      { source: "bin",      target: "python3"  },
-      { source: "bin",      target: "git"      },
-      { source: "bin",      target: "curl"     },
-      { source: "lib",      target: "libssl"   },
-      { source: "lib",      target: "libz"     },
-      { source: "var",      target: "log"      },
-      { source: "var",      target: "spool"    },
-      { source: "log",      target: "syslog"   },
-      { source: "log",      target: "auth-log" },
-      { source: "log",      target: "kern-log" },
-    ],
-  },
-
-  deps: {
-    title: "Package dependency tree",
-    root_id: "app",
-    nodes: [
-      // Root — 5 direct deps
-      { id: "app",          label: "my-app",      name: "my-app v1.0.0",           shape: "diamond",  color: "#0f766e", properties: { version: "1.0.0",   type: "application"    } },
-      { id: "react",        label: "react",        name: "react",                   shape: "square",   color: "#0ea5e9", properties: { version: "18.2.0",  weekly: "21M"          } },
-      { id: "lodash",       label: "lodash",       name: "lodash",                  shape: "square",   color: "#8b5cf6", properties: { version: "4.17.21", weekly: "48M"          } },
-      { id: "webpack",      label: "webpack",      name: "webpack",                 shape: "square",   color: "#f59e0b", properties: { version: "5.88.0",  weekly: "18M"          } },
-      { id: "typescript",   label: "typescript",   name: "typescript",              shape: "square",   color: "#3b82f6", properties: { version: "5.1.6",   weekly: "45M"          } },
-      { id: "axios",        label: "axios",        name: "axios",                   shape: "square",   color: "#10b981", properties: { version: "1.6.0",   weekly: "42M"          } },
-      // react — 3 children
-      { id: "react-dom",    label: "react-dom",    name: "react-dom",               shape: "circle",   color: "#38bdf8", properties: { version: "18.2.0",  peer: "react"          } },
-      { id: "scheduler",    label: "scheduler",    name: "scheduler",               shape: "circle",   color: "#7dd3fc", properties: { version: "0.23.0",  internal: "true"       } },
-      { id: "prop-types",   label: "prop-types",   name: "prop-types",              shape: "circle",   color: "#bae6fd", properties: { version: "15.8.1"                         } },
-      // lodash — 3 children
-      { id: "lodash-fp",    label: "lodash-fp",    name: "lodash-fp",               shape: "circle",   color: "#a78bfa", properties: { version: "0.10.4"                         } },
-      { id: "lodash-chunk", label: "chunk",        name: "lodash.chunk",            shape: "circle",   color: "#c4b5fd", properties: { version: "4.2.0"                          } },
-      { id: "lodash-merge", label: "merge",        name: "lodash.merge",            shape: "circle",   color: "#c4b5fd", properties: { version: "4.6.2"                          } },
-      // webpack — 4 children
-      { id: "babel-loader", label: "babel-ldr",    name: "babel-loader",            shape: "triangle", color: "#fcd34d", properties: { version: "9.1.3",   devDep: "true"        } },
-      { id: "css-loader",   label: "css-ldr",      name: "css-loader",              shape: "triangle", color: "#fde68a", properties: { version: "6.8.1",   devDep: "true"        } },
-      { id: "ts-loader",    label: "ts-ldr",       name: "ts-loader",               shape: "triangle", color: "#fef08a", properties: { version: "9.4.4",   devDep: "true"        } },
-      { id: "file-loader",  label: "file-ldr",     name: "file-loader",             shape: "triangle", color: "#fef9c3", properties: { version: "6.2.0",   devDep: "true"        } },
-      // typescript — 3 children
-      { id: "tslib",        label: "tslib",        name: "tslib",                   shape: "circle",   color: "#93c5fd", properties: { version: "2.6.0",   size: "12 KB"         } },
-      { id: "ts-node",      label: "ts-node",      name: "ts-node",                 shape: "circle",   color: "#bfdbfe", properties: { version: "10.9.1",  devDep: "true"        } },
-      { id: "ts-jest",      label: "ts-jest",      name: "ts-jest",                 shape: "circle",   color: "#bfdbfe", properties: { version: "29.1.0",  devDep: "true"        } },
-      // axios — 3 children
-      { id: "follow-redir", label: "follow-redir", name: "follow-redirects",        shape: "circle",   color: "#6ee7b7", properties: { version: "1.15.3"                         } },
-      { id: "form-data",    label: "form-data",    name: "form-data",               shape: "circle",   color: "#6ee7b7", properties: { version: "4.0.0"                          } },
-      { id: "proxy-agent",  label: "proxy-agent",  name: "https-proxy-agent",       shape: "circle",   color: "#6ee7b7", properties: { version: "7.0.2"                          } },
-    ],
-    edges: [
-      { source: "app",        target: "react"        },
-      { source: "app",        target: "lodash"       },
-      { source: "app",        target: "webpack"      },
-      { source: "app",        target: "typescript"   },
-      { source: "app",        target: "axios"        },
-      { source: "react",      target: "react-dom"    },
-      { source: "react",      target: "scheduler"    },
-      { source: "react",      target: "prop-types"   },
-      { source: "lodash",     target: "lodash-fp"    },
-      { source: "lodash",     target: "lodash-chunk" },
-      { source: "lodash",     target: "lodash-merge" },
-      { source: "webpack",    target: "babel-loader" },
-      { source: "webpack",    target: "css-loader"   },
-      { source: "webpack",    target: "ts-loader"    },
-      { source: "webpack",    target: "file-loader"  },
-      { source: "typescript", target: "tslib"        },
-      { source: "typescript", target: "ts-node"      },
-      { source: "typescript", target: "ts-jest"      },
-      { source: "axios",      target: "follow-redir" },
-      { source: "axios",      target: "form-data"    },
-      { source: "axios",      target: "proxy-agent"  },
-    ],
-  },
+const DEMO_IMAGE_SOURCES = {
+  "planetary-nebula": new URL("../assets/planetary-nebula.svg", import.meta.url).href
 };
 
-// Default layout params per example
-const DEFAULT_PARAMS = {
-  org:  { nodeRadius: 18, levelGap: 90, siblingGap: 44 },
-  fs:   { nodeRadius: 16, levelGap: 80, siblingGap: 40 },
-  deps: { nodeRadius: 18, levelGap: 88, siblingGap: 44 },
-};
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const state = {
-  example:        "org",
-  offsetX:        0,
-  offsetY:        0,
-  zoom:           1.0,
-  pixelRatio:     Math.min(window.devicePixelRatio || 1, 4),
-  selectedNodeId: null,
-  shapeOverride:  null,   // null = use per-node shape from example data
-  labelInside:    false,
-};
-
-// ─── DOM refs ────────────────────────────────────────────────────────────────
-
-const canvas          = document.getElementById("tree-canvas");
-const statusPanel     = document.getElementById("status-panel");
-const detailsPanel    = document.getElementById("tree-details");
-const exampleSelect   = document.getElementById("example-select");
-const radiusInput     = document.getElementById("node-radius");
-const radiusVal       = document.getElementById("node-radius-val");
-const levelGapInput   = document.getElementById("level-gap");
-const levelGapVal     = document.getElementById("level-gap-val");
-const sibGapInput     = document.getElementById("sibling-gap");
-const sibGapVal       = document.getElementById("sibling-gap-val");
-const shapeBtns       = document.querySelectorAll(".shape-btn");
-const labelInsideCheck= document.getElementById("label-inside");
-const resetBtn        = document.getElementById("tree-reset");
-const prInput         = document.getElementById("pixel-ratio");
-const prVal           = document.getElementById("pixel-ratio-val");
-
-// ─── Canvas coordinate helpers ───────────────────────────────────────────────
-
-function toCanvasPt(e) {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (e.clientX - rect.left) * (canvas.width  / rect.width),
-    y: (e.clientY - rect.top)  * (canvas.height / rect.height),
-  };
-}
-
-// ─── Canvas setup ────────────────────────────────────────────────────────────
-
-// Lock canvas to its current CSS display size at pixel_ratio resolution.
-// Must be called after layout is settled (post-init).
-function setupCanvas() {
-  const pr   = state.pixelRatio;
-  const rect = canvas.getBoundingClientRect();
-  const cssW = Math.round(rect.width);
-  const cssH = Math.round(rect.height) || Math.round(cssW * 540 / 820);
-  canvas.style.width  = cssW + "px";
-  canvas.style.height = cssH + "px";
-  canvas.width  = Math.round(cssW * pr);
-  canvas.height = Math.round(cssH * pr);
-}
-
-// ─── Spec builder ────────────────────────────────────────────────────────────
-
-function buildSpec() {
-  const pr = state.pixelRatio;
-  const ex = EXAMPLES[state.example];
-  return {
-    width:        canvas.width,
-    height:       canvas.height,
-    title:        ex.title,
-    root_id:      ex.root_id,
-    node_radius:  Math.round(parseInt(radiusInput.value)   * pr * state.zoom),
-    level_gap:    Math.round(parseInt(levelGapInput.value)  * pr * state.zoom),
-    sibling_gap:  Math.round(parseInt(sibGapInput.value)    * pr * state.zoom),
-    margin:       Math.round(28 * pr),
-    offset_x:     state.offsetX,
-    offset_y:     state.offsetY,
-    pixel_ratio:  pr,
-    selected_node_id: state.selectedNodeId,
-    nodes: ex.nodes.map(n => ({
-      id:           n.id,
-      label:        n.label,
-      name:         n.name  ?? null,
-      color:        n.color ?? null,
-      shape:        state.shapeOverride ?? n.shape ?? "circle",
-      label_inside: state.labelInside,
-      properties:   n.properties ?? {},
-    })),
-    edges: ex.edges,
-  };
-}
-
-// ─── Render ──────────────────────────────────────────────────────────────────
-
-function render() {
-  try {
-    wasm.render_tree("tree-canvas", buildSpec());
-  } catch (e) {
-    console.error("[tree] render error:", e.message ?? e);
-  }
-}
-
-// ─── Details panel ───────────────────────────────────────────────────────────
-
-function renderDetails() {
-  if (!state.selectedNodeId) {
-    detailsPanel.replaceChildren(
-      Object.assign(document.createElement("p"), {
-        className:   "details-empty-copy",
-        textContent: "Click a node to inspect it.",
-      })
-    );
+async function preloadGraphImages() {
+  if (typeof wasm.register_graph_image !== "function") {
     return;
   }
 
-  const node = EXAMPLES[state.example].nodes.find(n => n.id === state.selectedNodeId);
-  if (!node) return;
+  await Promise.all(
+    Object.entries(DEMO_IMAGE_SOURCES).map(async ([key, src]) => {
+      if (typeof wasm.has_graph_image === "function" && wasm.has_graph_image(key)) {
+        return;
+      }
 
-  const h3 = Object.assign(document.createElement("h3"), {
-    textContent: node.name ?? node.label,
-  });
+      try {
+        await wasm.register_graph_image(key, src);
+      } catch (error) {
+        console.warn(`[tree] image preload failed for ${key}`, error);
+      }
+    })
+  );
+}
 
-  const effectiveShape = state.shapeOverride ?? node.shape ?? "circle";
-  const meta = Object.assign(document.createElement("p"), {
-    className:   "details-meta",
-    textContent: `id: ${node.id}  ·  shape: ${effectiveShape}`,
-  });
+const SCENARIOS = {
+  stellar: {
+    kicker: "Evolution branches from a dense molecular nursery",
+    title: "Stellar evolution pathways",
+    summary:
+      "A compact lineage from fragmented cold gas into low-mass dwarfs, sun-like stars, and the short-lived massive branch that ends in compact remnants.",
+    note:
+      "This dataset is tuned to read like a clean observatory wall graphic. Branch colors stay category-driven, while the frontend controls expose node outlines, edge weight, and label placement.",
+    facts: [
+      { label: "Best for", value: "Showing stable branch depth without losing labels." },
+      { label: "Primary tracers", value: "Dust lanes, infrared excess, ionized ejecta." },
+      { label: "Curated lens", value: "A physical storyline, not a full stellar census." }
+    ],
+    legend: [
+      { label: "Collapse and fragmentation", color: "#0f766e" },
+      { label: "Sun-like evolution", color: "#d97706" },
+      { label: "Massive stellar endpoints", color: "#b42318" }
+    ],
+    defaults: {
+      nodeRadius: 18,
+      levelGap: 104,
+      siblingGap: 54,
+      edgeWidth: 2,
+      forceLabelInside: false
+    },
+    rootId: "cloud",
+    nodes: [
+      {
+        id: "cloud",
+        label: "Cloud",
+        name: "Molecular cloud",
+        color: "#0f766e",
+        shape: "diamond",
+        labelInside: true,
+        style: { radius: 24, stroke_color: "#0b3d3a", stroke_width: 2 },
+        media: { kind: "icon", icon: "galaxy", scale: 0.8, tint_color: "#f8fafc" },
+        properties: { phase: "cold gas", scale: "80 pc filament", tracer: "CO and dust" }
+      },
+      {
+        id: "cores",
+        label: "Cores",
+        name: "Fragmented dense cores",
+        color: "#1d4ed8",
+        shape: "square",
+        labelInside: true,
+        media: { kind: "icon", icon: "database", scale: 0.64, tint_color: "#eff6ff" },
+        properties: { phase: "fragmentation", density: "10^4 cm^-3", view: "millimeter maps" }
+      },
+      {
+        id: "low-track",
+        label: "Low mass",
+        name: "Low-mass channel",
+        color: "#0f766e",
+        shape: "square",
+        labelInside: false,
+        properties: { mass: "< 0.5 Msun", cadence: "slow", outcome: "long-lived dwarfs" }
+      },
+      {
+        id: "solar-track",
+        label: "Solar",
+        name: "Solar-mass channel",
+        color: "#d97706",
+        shape: "square",
+        labelInside: false,
+        properties: { mass: "0.8 - 1.2 Msun", cadence: "moderate", outcome: "white dwarf" }
+      },
+      {
+        id: "massive-track",
+        label: "Massive",
+        name: "Massive-star channel",
+        color: "#b42318",
+        shape: "square",
+        labelInside: false,
+        properties: { mass: "> 8 Msun", cadence: "fast", outcome: "compact remnant" }
+      },
+      {
+        id: "low-proto",
+        label: "Proto",
+        name: "Low-mass protostar",
+        color: "#14b8a6",
+        shape: "circle",
+        labelInside: true,
+        properties: { phase: "Class I", tracer: "far infrared", envelope: "dust rich" }
+      },
+      {
+        id: "brown-dwarf",
+        label: "BD",
+        name: "Brown dwarf",
+        color: "#2dd4bf",
+        shape: "triangle",
+        labelInside: true,
+        properties: { phase: "substellar", surface: "cool atmosphere", rarity: "common" }
+      },
+      {
+        id: "m-dwarf",
+        label: "M dwarf",
+        name: "Active M dwarf",
+        color: "#0f766e",
+        shape: "circle",
+        properties: { phase: "main sequence", activity: "flares", lifetime: "> 100 Gyr" }
+      },
+      {
+        id: "red-dwarf",
+        label: "Quiet red dwarf",
+        name: "Quiescent red dwarf",
+        color: "#0b5f58",
+        shape: "circle",
+        properties: { phase: "settled dwarf", activity: "reduced", planets: "temperate hosts" }
+      },
+      {
+        id: "solar-proto",
+        label: "Proto",
+        name: "Solar-mass protostar",
+        color: "#f59e0b",
+        shape: "circle",
+        labelInside: true,
+        properties: { phase: "Class I", tracer: "infrared", accretion: "disk fed" }
+      },
+      {
+        id: "t-tauri",
+        label: "T Tauri",
+        name: "T Tauri star",
+        color: "#fbbf24",
+        shape: "circle",
+        properties: { phase: "pre-main sequence", tracer: "H alpha", variability: "high" }
+      },
+      {
+        id: "solar-main",
+        label: "Solar analog",
+        name: "Sun-like main sequence star",
+        color: "#f97316",
+        shape: "circle",
+        properties: { phase: "stable burning", duration: "10 Gyr", survey: "planet searches" }
+      },
+      {
+        id: "red-giant",
+        label: "Red giant",
+        name: "Red giant branch",
+        color: "#ea580c",
+        shape: "circle",
+        properties: { phase: "envelope expansion", radius: "100 Rsun", tracer: "near infrared" }
+      },
+      {
+        id: "planetary-nebula",
+        label: "Nebula",
+        name: "Planetary nebula",
+        color: "#fb923c",
+        shape: "triangle",
+        media: {
+          kind: "image",
+          image_key: "planetary-nebula",
+          fit: "cover",
+          scale: 0.86,
+          fallback_icon: "camera"
+        },
+        properties: { phase: "shell ejection", visibility: "10 kyr", tracer: "[OIII]" }
+      },
+      {
+        id: "white-dwarf",
+        label: "WD",
+        name: "White dwarf",
+        color: "#94a3b8",
+        shape: "diamond",
+        labelInside: true,
+        media: { kind: "icon", icon: "star", scale: 0.68, tint_color: "#ffffff" },
+        properties: { phase: "compact remnant", mass: "0.6 Msun", cooling: "billions of years" }
+      },
+      {
+        id: "massive-proto",
+        label: "Proto",
+        name: "Massive protostar",
+        color: "#dc2626",
+        shape: "circle",
+        labelInside: true,
+        style: { radius: 20 },
+        properties: { phase: "embedded", tracer: "masers", feedback: "strong" }
+      },
+      {
+        id: "blue-supergiant",
+        label: "Blue SG",
+        name: "Blue supergiant",
+        color: "#ef4444",
+        shape: "circle",
+        labelInside: true,
+        properties: { phase: "hot luminous", wind: "fast", temperature: "20 kK" }
+      },
+      {
+        id: "red-supergiant",
+        label: "Red SG",
+        name: "Red supergiant",
+        color: "#f97316",
+        shape: "circle",
+        labelInside: true,
+        properties: { phase: "extended envelope", radius: "1000 Rsun", tracer: "infrared" }
+      },
+      {
+        id: "core-collapse",
+        label: "Collapse",
+        name: "Core-collapse supernova",
+        color: "#b42318",
+        shape: "diamond",
+        labelInside: true,
+        style: { radius: 22, stroke_color: "#7f1d1d", stroke_width: 2 },
+        media: { kind: "icon", icon: "alert", scale: 0.7, tint_color: "#fff7ed" },
+        properties: { phase: "explosion", signal: "optical and neutrinos", duration: "weeks" }
+      },
+      {
+        id: "neutron-star",
+        label: "NS",
+        name: "Neutron star",
+        color: "#7c3aed",
+        shape: "square",
+        labelInside: true,
+        properties: { phase: "compact remnant", density: "nuclear", signal: "X-ray and radio" }
+      },
+      {
+        id: "black-hole",
+        label: "BH",
+        name: "Black hole",
+        color: "#111827",
+        shape: "square",
+        labelInside: true,
+        properties: { phase: "compact remnant", horizon: "present", signal: "accretion or GW" }
+      }
+    ],
+    edges: [
+      { source: "cloud", target: "cores", style: { stroke_color: "#0f766e", opacity: 0.82 } },
+      { source: "cores", target: "low-track", style: { stroke_color: "#0f766e" } },
+      { source: "cores", target: "solar-track", style: { stroke_color: "#d97706" } },
+      { source: "cores", target: "massive-track", style: { stroke_color: "#b42318" } },
+      { source: "low-track", target: "low-proto" },
+      { source: "low-proto", target: "brown-dwarf", style: { stroke_color: "#14b8a6" } },
+      { source: "low-proto", target: "m-dwarf", style: { stroke_color: "#0f766e" } },
+      { source: "m-dwarf", target: "red-dwarf", style: { stroke_color: "#0b5f58" } },
+      { source: "solar-track", target: "solar-proto" },
+      { source: "solar-proto", target: "t-tauri" },
+      { source: "t-tauri", target: "solar-main" },
+      { source: "solar-main", target: "red-giant" },
+      { source: "red-giant", target: "planetary-nebula", style: { stroke_color: "#fb923c" } },
+      { source: "planetary-nebula", target: "white-dwarf", style: { stroke_color: "#94a3b8" } },
+      { source: "massive-track", target: "massive-proto", style: { stroke_color: "#dc2626" } },
+      { source: "massive-proto", target: "blue-supergiant", style: { stroke_color: "#ef4444" } },
+      { source: "blue-supergiant", target: "red-supergiant", style: { stroke_color: "#f97316" } },
+      { source: "red-supergiant", target: "core-collapse", style: { stroke_color: "#b42318", stroke_width: 3 } },
+      { source: "core-collapse", target: "neutron-star", style: { stroke_color: "#7c3aed" } },
+      { source: "core-collapse", target: "black-hole", style: { stroke_color: "#111827" } }
+    ]
+  },
+  deepfield: {
+    kicker: "Taxonomy for a mixed deep-field cutout",
+    title: "Deep field taxonomy",
+    summary:
+      "A compact classification tree for the objects that dominate a long-exposure field: faint galaxies, active nuclei, foreground stars, and rare transient events.",
+    note:
+      "This branch set is useful when you want long labels and very different object classes on the same canvas. The quieter preset turns it into a catalog plate, while the stronger presets emphasize category color.",
+    facts: [
+      { label: "Best for", value: "Label density and mixed node shapes." },
+      { label: "Primary tracers", value: "Photometric redshift, morphology, variability." },
+      { label: "Curated lens", value: "Representative classes from one editorial field." }
+    ],
+    legend: [
+      { label: "Galaxy populations", color: "#2563eb" },
+      { label: "Active nuclei", color: "#b42318" },
+      { label: "Foreground and stellar contaminants", color: "#0f766e" },
+      { label: "Transient channels", color: "#d97706" }
+    ],
+    defaults: {
+      nodeRadius: 17,
+      levelGap: 98,
+      siblingGap: 60,
+      edgeWidth: 2,
+      forceLabelInside: false
+    },
+    rootId: "deep-field",
+    nodes: [
+      {
+        id: "deep-field",
+        label: "Field",
+        name: "Ultra-deep pointing",
+        color: "#1f2937",
+        shape: "diamond",
+        labelInside: true,
+        style: { radius: 24, stroke_color: "#0f172a", stroke_width: 2 },
+        properties: { exposure: "160 hr stack", filter_set: "optical to near IR", aim: "taxonomy" }
+      },
+      {
+        id: "galaxies",
+        label: "Galaxies",
+        name: "Galaxy branch",
+        color: "#2563eb",
+        shape: "square",
+        labelInside: true,
+        properties: { count: "dominant population", signal: "morphology and colors" }
+      },
+      {
+        id: "quasars",
+        label: "AGN",
+        name: "Active nuclei branch",
+        color: "#b42318",
+        shape: "square",
+        labelInside: true,
+        properties: { count: "sparse but bright", signal: "broad lines and variability" }
+      },
+      {
+        id: "stars",
+        label: "Stars",
+        name: "Foreground star branch",
+        color: "#0f766e",
+        shape: "square",
+        labelInside: true,
+        properties: { count: "foreground", signal: "proper colors and PSF" }
+      },
+      {
+        id: "transients",
+        label: "Transients",
+        name: "Transient branch",
+        color: "#d97706",
+        shape: "square",
+        labelInside: true,
+        properties: { count: "rare", signal: "multi-epoch difference imaging" }
+      },
+      {
+        id: "lyman-break",
+        label: "LBG",
+        name: "Lyman-break galaxy",
+        color: "#3b82f6",
+        shape: "circle",
+        labelInside: true,
+        properties: { redshift: "z ~ 6", signal: "dropout colors", morphology: "compact" }
+      },
+      {
+        id: "barred-spiral",
+        label: "Barred spiral",
+        name: "Barred spiral",
+        color: "#60a5fa",
+        shape: "circle",
+        properties: { redshift: "z ~ 0.6", signal: "resolved arms", morphology: "disk" }
+      },
+      {
+        id: "dusty-merger",
+        label: "Dusty merger",
+        name: "Dust-obscured merger",
+        color: "#1d4ed8",
+        shape: "triangle",
+        properties: { redshift: "z ~ 2", signal: "ir excess", morphology: "tidal tails" }
+      },
+      {
+        id: "green-pea",
+        label: "Green pea",
+        name: "Compact starburst",
+        color: "#38bdf8",
+        shape: "triangle",
+        properties: { redshift: "z ~ 0.3", signal: "[OIII] boost", morphology: "compact" }
+      },
+      {
+        id: "broad-line",
+        label: "Broad-line",
+        name: "Broad-line quasar",
+        color: "#ef4444",
+        shape: "circle",
+        properties: { redshift: "z ~ 2.1", signal: "broad emission", brightness: "high" }
+      },
+      {
+        id: "obscured-agn",
+        label: "Obscured AGN",
+        name: "Obscured nucleus",
+        color: "#dc2626",
+        shape: "triangle",
+        properties: { redshift: "z ~ 1.4", signal: "mid-IR excess", brightness: "moderate" }
+      },
+      {
+        id: "lens-candidate",
+        label: "Lens cand.",
+        name: "Lensed quasar candidate",
+        color: "#f87171",
+        shape: "diamond",
+        labelInside: true,
+        properties: { redshift: "z ~ 2.7", signal: "multiple images", rarity: "rare" }
+      },
+      {
+        id: "cool-dwarf",
+        label: "Cool dwarf",
+        name: "Cool dwarf interloper",
+        color: "#14b8a6",
+        shape: "circle",
+        properties: { subtype: "late M", signal: "stellar colors", motion: "foreground" }
+      },
+      {
+        id: "halo-giant",
+        label: "Halo giant",
+        name: "Halo giant",
+        color: "#0f766e",
+        shape: "triangle",
+        properties: { subtype: "K giant", signal: "resolved PSF", motion: "foreground" }
+      },
+      {
+        id: "wd-interloper",
+        label: "WD",
+        name: "White dwarf interloper",
+        color: "#94a3b8",
+        shape: "diamond",
+        labelInside: true,
+        properties: { subtype: "DA", signal: "blue colors", motion: "foreground" }
+      },
+      {
+        id: "type-ia",
+        label: "Type Ia",
+        name: "Type Ia supernova",
+        color: "#f59e0b",
+        shape: "circle",
+        properties: { redshift: "z ~ 0.8", signal: "standard candle", cadence: "days" }
+      },
+      {
+        id: "kilonova",
+        label: "Kilonova",
+        name: "Kilonova candidate",
+        color: "#d97706",
+        shape: "diamond",
+        labelInside: true,
+        properties: { redshift: "local", signal: "fast red fade", rarity: "very rare" }
+      },
+      {
+        id: "tidal-disruption",
+        label: "TDE",
+        name: "Tidal disruption event",
+        color: "#fb923c",
+        shape: "triangle",
+        properties: { redshift: "z ~ 0.2", signal: "nuclear flare", cadence: "weeks" }
+      },
+      {
+        id: "fast-blue",
+        label: "Fast blue",
+        name: "Fast blue optical transient",
+        color: "#fdba74",
+        shape: "triangle",
+        properties: { redshift: "z ~ 0.5", signal: "blue rise", cadence: "hours" }
+      }
+    ],
+    edges: [
+      { source: "deep-field", target: "galaxies", style: { stroke_color: "#2563eb" } },
+      { source: "deep-field", target: "quasars", style: { stroke_color: "#b42318" } },
+      { source: "deep-field", target: "stars", style: { stroke_color: "#0f766e" } },
+      { source: "deep-field", target: "transients", style: { stroke_color: "#d97706" } },
+      { source: "galaxies", target: "lyman-break" },
+      { source: "galaxies", target: "barred-spiral" },
+      { source: "galaxies", target: "dusty-merger" },
+      { source: "galaxies", target: "green-pea" },
+      { source: "quasars", target: "broad-line" },
+      { source: "quasars", target: "obscured-agn" },
+      { source: "quasars", target: "lens-candidate", style: { stroke_width: 3 } },
+      { source: "stars", target: "cool-dwarf" },
+      { source: "stars", target: "halo-giant" },
+      { source: "stars", target: "wd-interloper" },
+      { source: "transients", target: "type-ia" },
+      { source: "transients", target: "kilonova", style: { stroke_color: "#b45309", stroke_width: 3 } },
+      { source: "transients", target: "tidal-disruption" },
+      { source: "transients", target: "fast-blue" }
+    ]
+  },
+  program: {
+    kicker: "A mission-style branch set for a survey pipeline",
+    title: "Survey program tree",
+    summary:
+      "A clean program hierarchy that tracks an imagined wide-field campaign from observing modes through calibration and public data products.",
+    note:
+      "This tree is less about astrophysics and more about structure. It gives frontend developers a practical graph with repeated branch widths, long product names, and a few highlighted milestones.",
+    facts: [
+      { label: "Best for", value: "Process trees, mission roadmaps, or program taxonomies." },
+      { label: "Primary tracers", value: "Observing tier, calibration path, release packaging." },
+      { label: "Curated lens", value: "Inspired by Roman-style survey planning." }
+    ],
+    legend: [
+      { label: "Survey modes", color: "#0f766e" },
+      { label: "Calibration work", color: "#2563eb" },
+      { label: "Release products", color: "#b42318" }
+    ],
+    defaults: {
+      nodeRadius: 17,
+      levelGap: 94,
+      siblingGap: 52,
+      edgeWidth: 2,
+      forceLabelInside: false
+    },
+    rootId: "roman-wide",
+    nodes: [
+      {
+        id: "roman-wide",
+        label: "Roman",
+        name: "Wide-field survey program",
+        color: "#0f172a",
+        shape: "diamond",
+        labelInside: true,
+        style: { radius: 24, stroke_color: "#0f172a", stroke_width: 2 },
+        properties: { mission: "Roman-like", cadence: "multi-season", status: "planning" }
+      },
+      {
+        id: "high-latitude",
+        label: "High latitude",
+        name: "High-latitude survey",
+        color: "#0f766e",
+        shape: "square",
+        labelInside: true,
+        properties: { area: "2000 sq deg", science: "dark energy and galaxies" }
+      },
+      {
+        id: "time-domain",
+        label: "Time domain",
+        name: "Time-domain survey",
+        color: "#d97706",
+        shape: "square",
+        labelInside: true,
+        properties: { area: "rolling fields", science: "supernovae and microlensing" }
+      },
+      {
+        id: "calibration",
+        label: "Calibration",
+        name: "Calibration branch",
+        color: "#2563eb",
+        shape: "square",
+        labelInside: true,
+        properties: { area: "reference visits", science: "stability and zeropoints" }
+      },
+      {
+        id: "products",
+        label: "Products",
+        name: "Public data products",
+        color: "#b42318",
+        shape: "square",
+        labelInside: true,
+        properties: { area: "archive", science: "community delivery" }
+      },
+      {
+        id: "prism-field",
+        label: "Prism field",
+        name: "Slitless prism tier",
+        color: "#14b8a6",
+        shape: "circle",
+        properties: { exposure: "deep", output: "low-res spectra", mode: "survey" }
+      },
+      {
+        id: "weak-lensing",
+        label: "Weak lensing",
+        name: "Weak-lensing imaging tier",
+        color: "#0f766e",
+        shape: "circle",
+        properties: { exposure: "broad filters", output: "shape catalog", mode: "survey" }
+      },
+      {
+        id: "galaxy-redshift",
+        label: "Redshift tiles",
+        name: "Galaxy redshift tiles",
+        color: "#2dd4bf",
+        shape: "triangle",
+        properties: { exposure: "repeat visits", output: "redshift map", mode: "survey" }
+      },
+      {
+        id: "cadence-tier",
+        label: "Cadence tier",
+        name: "Cadence control tier",
+        color: "#f59e0b",
+        shape: "circle",
+        properties: { exposure: "5 day spacing", output: "visit schedule", mode: "time domain" }
+      },
+      {
+        id: "supernova-broker",
+        label: "SN broker",
+        name: "Supernova broker lane",
+        color: "#d97706",
+        shape: "circle",
+        labelInside: true,
+        properties: { exposure: "difference imaging", output: "alert packets", mode: "time domain" }
+      },
+      {
+        id: "microlensing",
+        label: "Microlensing",
+        name: "Microlensing monitor",
+        color: "#fb923c",
+        shape: "triangle",
+        properties: { exposure: "high cadence", output: "light curves", mode: "time domain" }
+      },
+      {
+        id: "standard-stars",
+        label: "Standards",
+        name: "Standard-star ladder",
+        color: "#3b82f6",
+        shape: "circle",
+        properties: { visit: "nightly", output: "zeropoints", mode: "calibration" }
+      },
+      {
+        id: "flat-fields",
+        label: "Flat fields",
+        name: "Flat-field drift checks",
+        color: "#60a5fa",
+        shape: "circle",
+        properties: { visit: "weekly", output: "response map", mode: "calibration" }
+      },
+      {
+        id: "psf-monitor",
+        label: "PSF monitor",
+        name: "PSF stability monitor",
+        color: "#1d4ed8",
+        shape: "triangle",
+        properties: { visit: "every orbit", output: "focus metrics", mode: "calibration" }
+      },
+      {
+        id: "coadds",
+        label: "Coadds",
+        name: "Deep coadd mosaics",
+        color: "#ef4444",
+        shape: "circle",
+        properties: { release: "seasonal", output: "stacked tiles", audience: "science teams" }
+      },
+      {
+        id: "photoz",
+        label: "Photo-z",
+        name: "Photometric redshift tiles",
+        color: "#b42318",
+        shape: "circle",
+        properties: { release: "seasonal", output: "probability grids", audience: "science teams" }
+      },
+      {
+        id: "archive-relay",
+        label: "Archive",
+        name: "Archive relay",
+        color: "#991b1b",
+        shape: "triangle",
+        properties: { release: "continuous", output: "queryable bundles", audience: "archive" }
+      },
+      {
+        id: "public-release",
+        label: "Release",
+        name: "Public data release",
+        color: "#7f1d1d",
+        shape: "diamond",
+        labelInside: true,
+        style: { radius: 20 },
+        properties: { release: "annual", output: "docs and tiles", audience: "community" }
+      }
+    ],
+    edges: [
+      { source: "roman-wide", target: "high-latitude", style: { stroke_color: "#0f766e" } },
+      { source: "roman-wide", target: "time-domain", style: { stroke_color: "#d97706" } },
+      { source: "roman-wide", target: "calibration", style: { stroke_color: "#2563eb" } },
+      { source: "roman-wide", target: "products", style: { stroke_color: "#b42318" } },
+      { source: "high-latitude", target: "prism-field" },
+      { source: "high-latitude", target: "weak-lensing" },
+      { source: "high-latitude", target: "galaxy-redshift" },
+      { source: "time-domain", target: "cadence-tier" },
+      { source: "time-domain", target: "supernova-broker", style: { stroke_width: 3 } },
+      { source: "time-domain", target: "microlensing" },
+      { source: "calibration", target: "standard-stars" },
+      { source: "calibration", target: "flat-fields" },
+      { source: "calibration", target: "psf-monitor" },
+      { source: "products", target: "coadds", style: { stroke_color: "#ef4444" } },
+      { source: "products", target: "photoz", style: { stroke_color: "#b42318" } },
+      { source: "products", target: "archive-relay", style: { stroke_color: "#991b1b" } },
+      { source: "archive-relay", target: "public-release", style: { stroke_color: "#7f1d1d", stroke_width: 3 } }
+    ]
+  }
+};
 
-  const colorRow = document.createElement("div");
-  colorRow.className = "color-row";
-  const swatch = Object.assign(document.createElement("span"), { className: "color-swatch" });
-  swatch.style.background = node.color ?? "#888";
-  const colorCode = Object.assign(document.createElement("code"), {
-    textContent: node.color ?? "auto",
-  });
-  colorRow.append(swatch, colorCode);
+const APPEARANCE_PRESETS = {
+  atlas: {
+    title: "Atlas",
+    nodeStyle: { stroke_color: "#e5eef1", stroke_width: 2, opacity: 0.96 },
+    edgeStyle: { stroke_color: "#8393a1", opacity: 0.78 },
+    selectionStyle: { stroke_color: "#c2410c", stroke_width: 3, padding: 10, opacity: 0.96 }
+  },
+  signal: {
+    title: "Signal",
+    nodeStyle: { stroke_color: "#0f172a", stroke_width: 2, opacity: 0.98 },
+    edgeStyle: { stroke_color: "#0f766e", opacity: 0.84 },
+    selectionStyle: { stroke_color: "#b42318", stroke_width: 3, padding: 10, opacity: 0.96 }
+  },
+  quiet: {
+    title: "Quiet",
+    nodeStyle: { stroke_color: "#cbd5e1", stroke_width: 1, opacity: 0.9 },
+    edgeStyle: { stroke_color: "#94a3b8", opacity: 0.58 },
+    selectionStyle: { stroke_color: "#334155", stroke_width: 2, padding: 8, opacity: 0.9 }
+  }
+};
+
+const state = {
+  scenario: "stellar",
+  preset: "atlas",
+  pixelRatio: Math.min(window.devicePixelRatio || 1, 3),
+  offsetX: 0,
+  offsetY: 0,
+  selectedNodeId: null,
+  collapsedNodeIds: [],
+  nodeRadius: 18,
+  levelGap: 104,
+  siblingGap: 54,
+  edgeWidth: 2,
+  forceLabelInside: false,
+  sessionHandle: null,
+  transitionFrame: null,
+  sessionDirty: true,
+  statusKind: "info"
+};
+
+const TREE_COLLAPSE_ANIMATION_MS = 220;
+
+const dom = {
+  canvas: document.getElementById("tree-canvas"),
+  statusPanel: document.getElementById("status-panel"),
+  scenarioButtons: Array.from(document.querySelectorAll("[data-scenario]")),
+  presetButtons: Array.from(document.querySelectorAll("[data-preset]")),
+  resetButton: document.getElementById("tree-reset"),
+  scenarioSelect: document.getElementById("scenario-select"),
+  title: document.getElementById("tree-title"),
+  kicker: document.getElementById("tree-kicker"),
+  summary: document.getElementById("tree-summary"),
+  note: document.getElementById("tree-note"),
+  facts: document.getElementById("tree-facts"),
+  stats: document.getElementById("tree-stats"),
+  legend: document.getElementById("tree-legend"),
+  details: document.getElementById("tree-details"),
+  nodeRadius: document.getElementById("node-radius"),
+  nodeRadiusValue: document.getElementById("node-radius-value"),
+  levelGap: document.getElementById("level-gap"),
+  levelGapValue: document.getElementById("level-gap-value"),
+  siblingGap: document.getElementById("sibling-gap"),
+  siblingGapValue: document.getElementById("sibling-gap-value"),
+  edgeWidth: document.getElementById("edge-width"),
+  edgeWidthValue: document.getElementById("edge-width-value"),
+  pixelRatio: document.getElementById("pixel-ratio"),
+  pixelRatioValue: document.getElementById("pixel-ratio-value"),
+  labelInside: document.getElementById("label-inside")
+};
+
+function clone(value) {
+  if (globalThis.structuredClone) {
+    return globalThis.structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value));
+}
+
+function displayName(node) {
+  return node.name ?? node.label ?? node.id;
+}
+
+function currentScenario() {
+  return SCENARIOS[state.scenario];
+}
+
+function currentPreset() {
+  return APPEARANCE_PRESETS[state.preset];
+}
+
+function setStatus(kind, title, body) {
+  state.statusKind = kind;
+  dom.statusPanel.className = `status-panel status-${kind}`;
+  dom.statusPanel.innerHTML = `
+    <p class="status-title">${title}</p>
+    <p class="status-body">${body}</p>
+  `;
+}
+
+function scaleSize(value, factor, minimum = 0) {
+  if (value == null) {
+    return value;
+  }
+  return Math.max(minimum, Math.round(value * factor));
+}
+
+function scaleNodeStyle(style, pixelRatio, zoom = 1) {
+  if (!style) {
+    return null;
+  }
+
+  const next = clone(style);
+  if (next.radius != null) {
+    next.radius = scaleSize(next.radius, pixelRatio * zoom, 1);
+  }
+  if (next.stroke_width != null) {
+    next.stroke_width = scaleSize(next.stroke_width, pixelRatio, 0);
+  }
+  return next;
+}
+
+function scaleEdgeStyle(style, pixelRatio) {
+  if (!style) {
+    return null;
+  }
+
+  const next = clone(style);
+  if (next.stroke_width != null) {
+    next.stroke_width = scaleSize(next.stroke_width, pixelRatio, 0);
+  }
+  return next;
+}
+
+function scaleSelectionStyle(style, pixelRatio) {
+  if (!style) {
+    return null;
+  }
+
+  const next = clone(style);
+  if (next.stroke_width != null) {
+    next.stroke_width = scaleSize(next.stroke_width, pixelRatio, 0);
+  }
+  if (next.padding != null) {
+    next.padding = scaleSize(next.padding, pixelRatio, 0);
+  }
+  return next;
+}
+
+function syncCanvasSize(force = false) {
+  const rect = dom.canvas.getBoundingClientRect();
+  const cssWidth = Math.max(320, Math.round(rect.width));
+  const cssHeight = Math.max(320, Math.round(rect.height));
+  const width = Math.round(cssWidth * state.pixelRatio);
+  const height = Math.round(cssHeight * state.pixelRatio);
+
+  if (!force && dom.canvas.width === width && dom.canvas.height === height) {
+    return false;
+  }
+
+  dom.canvas.width = width;
+  dom.canvas.height = height;
+  return true;
+}
+
+function eventPoint(event) {
+  const rect = dom.canvas.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * (dom.canvas.width / rect.width),
+    y: (event.clientY - rect.top) * (dom.canvas.height / rect.height)
+  };
+}
+
+function buildAdjacency(scenario) {
+  const children = new Map();
+  const parent = new Map();
+
+  for (const node of scenario.nodes) {
+    children.set(node.id, []);
+  }
+
+  for (const edge of scenario.edges) {
+    children.get(edge.source).push(edge.target);
+    parent.set(edge.target, edge.source);
+  }
+
+  return { children, parent };
+}
+
+function treeStats(scenario) {
+  const { children } = buildAdjacency(scenario);
+  const rootChildren = children.get(scenario.rootId) ?? [];
+  let leafCount = 0;
+  let maxDepth = 0;
+  let primarySplit = rootChildren.length;
+  const queue = [{ id: scenario.rootId, depth: 0 }];
+
+  while (queue.length) {
+    const current = queue.shift();
+    const nextChildren = children.get(current.id) ?? [];
+    if (!nextChildren.length) {
+      leafCount += 1;
+    }
+    if (primarySplit <= 1 && nextChildren.length > 1) {
+      primarySplit = nextChildren.length;
+    }
+    maxDepth = Math.max(maxDepth, current.depth);
+    for (const child of nextChildren) {
+      queue.push({ id: child, depth: current.depth + 1 });
+    }
+  }
+
+  return {
+    nodeCount: scenario.nodes.length,
+    leafCount,
+    maxDepth,
+    rootBranches: primarySplit
+  };
+}
+
+function lineageFor(nodeId, scenario) {
+  const { parent } = buildAdjacency(scenario);
+  const nodesById = new Map(scenario.nodes.map((node) => [node.id, node]));
+  const lineage = [];
+  let cursor = nodeId;
+
+  while (cursor) {
+    const node = nodesById.get(cursor);
+    lineage.unshift(node ? displayName(node) : cursor);
+    cursor = parent.get(cursor) ?? null;
+  }
+
+  return lineage;
+}
+
+function countDescendants(nodeId, scenario) {
+  const { children } = buildAdjacency(scenario);
+  let count = 0;
+  const queue = [...(children.get(nodeId) ?? [])];
+
+  while (queue.length) {
+    const current = queue.shift();
+    count += 1;
+    queue.push(...(children.get(current) ?? []));
+  }
+
+  return count;
+}
+
+function nodeHasChildren(nodeId, scenario) {
+  const { children } = buildAdjacency(scenario);
+  return (children.get(nodeId) ?? []).length > 0;
+}
+
+function isDescendantOf(ancestorId, nodeId, scenario) {
+  if (!ancestorId || !nodeId || ancestorId === nodeId) {
+    return false;
+  }
+
+  const { parent } = buildAdjacency(scenario);
+  let cursor = parent.get(nodeId) ?? null;
+  while (cursor) {
+    if (cursor === ancestorId) {
+      return true;
+    }
+    cursor = parent.get(cursor) ?? null;
+  }
+
+  return false;
+}
+
+function setCollapsedNodeState(nodeId, collapsed) {
+  const next = new Set(state.collapsedNodeIds);
+  if (collapsed) {
+    next.add(nodeId);
+  } else {
+    next.delete(nodeId);
+  }
+  state.collapsedNodeIds = [...next];
+}
+
+function updateButtonState(buttons, key, attribute) {
+  for (const button of buttons) {
+    const active = button.dataset[attribute] === key;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-pressed", String(active));
+  }
+}
+
+function renderScenarioMeta() {
+  const scenario = currentScenario();
+  const stats = treeStats(scenario);
+
+  dom.kicker.textContent = scenario.kicker;
+  dom.title.textContent = scenario.title;
+  dom.summary.textContent = scenario.summary;
+  dom.note.textContent = scenario.note;
+
+  dom.facts.innerHTML = scenario.facts
+    .map(
+      (fact) => `
+        <div class="info-row">
+          <span class="info-label">${fact.label}</span>
+          <span class="info-value">${fact.value}</span>
+        </div>
+      `
+    )
+    .join("");
+
+  dom.stats.innerHTML = `
+    <article class="stat-tile">
+      <span class="stat-label">Nodes</span>
+      <span class="stat-value">${stats.nodeCount}</span>
+    </article>
+    <article class="stat-tile">
+      <span class="stat-label">Leaf endpoints</span>
+      <span class="stat-value">${stats.leafCount}</span>
+    </article>
+    <article class="stat-tile">
+      <span class="stat-label">Max depth</span>
+      <span class="stat-value">${stats.maxDepth}</span>
+    </article>
+    <article class="stat-tile">
+      <span class="stat-label">Primary split</span>
+      <span class="stat-value" data-tone="warm">${stats.rootBranches} branches</span>
+    </article>
+  `;
+
+  dom.legend.innerHTML = scenario.legend
+    .map(
+      (entry) => `
+        <li>
+          <span class="legend-swatch" style="background:${entry.color}"></span>
+          <span>${entry.label}</span>
+        </li>
+      `
+    )
+    .join("");
+
+  updateButtonState(dom.scenarioButtons, state.scenario, "scenario");
+  updateButtonState(dom.presetButtons, state.preset, "preset");
+  dom.scenarioSelect.value = state.scenario;
+}
+
+function renderProperties(properties) {
+  const entries = Object.entries(properties ?? {});
+  if (!entries.length) {
+    const empty = document.createElement("p");
+    empty.className = "details-empty-copy";
+    empty.textContent = "No custom properties on this node.";
+    return empty;
+  }
 
   const dl = document.createElement("dl");
   dl.className = "property-list";
-  for (const [k, v] of Object.entries(node.properties ?? {})) {
+
+  for (const [key, value] of entries) {
     const row = document.createElement("div");
     row.className = "property-row";
-    row.append(
-      Object.assign(document.createElement("dt"), { textContent: k }),
-      Object.assign(document.createElement("dd"), { textContent: v })
-    );
-    dl.appendChild(row);
+
+    const dt = document.createElement("dt");
+    dt.textContent = key;
+
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+
+    row.append(dt, dd);
+    dl.append(row);
   }
 
-  detailsPanel.replaceChildren(h3, meta, colorRow, dl);
+  return dl;
 }
 
-// ─── Example switcher ────────────────────────────────────────────────────────
+function renderDetails() {
+  const scenario = currentScenario();
+  const node = scenario.nodes.find((entry) => entry.id === state.selectedNodeId);
 
-function switchExample(key) {
-  state.example        = key;
-  state.offsetX        = 0;
-  state.offsetY        = 0;
-  state.zoom           = 1.0;
-  state.selectedNodeId = null;
+  if (!node) {
+    const stack = document.createElement("div");
+    stack.className = "selection-stack";
 
-  const p = DEFAULT_PARAMS[key];
-  radiusInput.value    = p.nodeRadius;
-  levelGapInput.value  = p.levelGap;
-  sibGapInput.value    = p.siblingGap;
-  radiusVal.textContent    = p.nodeRadius;
-  levelGapVal.textContent  = p.levelGap;
-  sibGapVal.textContent    = p.siblingGap;
+    const heading = document.createElement("h4");
+    heading.textContent = "No node selected";
 
-  render();
-  renderDetails();
+    const body = document.createElement("p");
+    body.className = "details-empty-copy";
+    body.textContent =
+      "Select a node to inspect its lineage, children, and survey-facing metadata.";
+
+    const presetBlock = document.createElement("div");
+    presetBlock.className = "detail-block";
+    presetBlock.innerHTML = `
+      <span class="detail-key">Active appearance</span>
+      <span class="detail-value">${currentPreset().title}</span>
+    `;
+
+    stack.append(heading, body, presetBlock);
+    dom.details.replaceChildren(stack);
+    return;
+  }
+
+  const { children } = buildAdjacency(scenario);
+  const lineage = lineageFor(node.id, scenario).join(" -> ");
+  const childCount = (children.get(node.id) ?? []).length;
+  const descendantCount = countDescendants(node.id, scenario);
+  const collapsed = state.collapsedNodeIds.includes(node.id);
+
+  const stack = document.createElement("div");
+  stack.className = "selection-stack";
+
+  const heading = document.createElement("h4");
+  heading.textContent = displayName(node);
+
+  const meta = document.createElement("p");
+  meta.className = "details-meta";
+  meta.textContent =
+    `ID ${node.id} - ${childCount} child branches - ${descendantCount} descendants - ${collapsed ? "collapsed" : "expanded"}`;
+
+  const lineageBlock = document.createElement("div");
+  lineageBlock.className = "detail-block";
+  lineageBlock.innerHTML = `
+    <span class="detail-key">Lineage</span>
+    <span class="detail-value">${lineage}</span>
+  `;
+
+  const shapeBlock = document.createElement("div");
+  shapeBlock.className = "detail-block";
+  const mediaLabel = node.media?.kind === "image"
+    ? `image (${node.media.image_key})`
+    : node.media?.icon
+      ? `icon (${node.media.icon})`
+      : "none";
+  shapeBlock.innerHTML = `
+    <span class="detail-key">Render treatment</span>
+    <span class="detail-value">${node.shape ?? "circle"} node, media ${mediaLabel}${state.forceLabelInside ? ", labels forced inside" : ""}</span>
+  `;
+
+  stack.append(heading, meta, lineageBlock, shapeBlock, renderProperties(node.properties));
+  dom.details.replaceChildren(stack);
 }
 
-// ─── Pan (pointer drag) ──────────────────────────────────────────────────────
+function syncControls() {
+  dom.nodeRadius.value = String(state.nodeRadius);
+  dom.nodeRadiusValue.textContent = `${state.nodeRadius}px`;
 
-let pointerDown = false;
-let lastPt  = { x: 0, y: 0 };
-let startPt = { x: 0, y: 0 };
-let didDrag = false;
+  dom.levelGap.value = String(state.levelGap);
+  dom.levelGapValue.textContent = `${state.levelGap}px`;
 
-canvas.addEventListener("pointerdown", e => {
-  pointerDown = true;
-  didDrag     = false;
-  lastPt      = toCanvasPt(e);
-  startPt     = { ...lastPt };
-  canvas.setPointerCapture(e.pointerId);
-  canvas.classList.add("is-dragging");
-  e.preventDefault();
-});
+  dom.siblingGap.value = String(state.siblingGap);
+  dom.siblingGapValue.textContent = `${state.siblingGap}px`;
 
-canvas.addEventListener("pointermove", e => {
-  if (!pointerDown) return;
-  const pt = toCanvasPt(e);
-  if (Math.hypot(pt.x - startPt.x, pt.y - startPt.y) > 4) didDrag = true;
-  state.offsetX += Math.round(pt.x - lastPt.x);
-  state.offsetY += Math.round(pt.y - lastPt.y);
-  lastPt = pt;
-  render();
-  e.preventDefault();
-});
+  dom.edgeWidth.value = String(state.edgeWidth);
+  dom.edgeWidthValue.textContent = `${state.edgeWidth}px`;
 
-function endPan() {
-  pointerDown = false;
-  canvas.classList.remove("is-dragging");
+  dom.pixelRatio.value = String(state.pixelRatio);
+  dom.pixelRatioValue.textContent = `${state.pixelRatio}x`;
+
+  dom.labelInside.checked = state.forceLabelInside;
 }
-canvas.addEventListener("pointerup",     endPan);
-canvas.addEventListener("pointercancel", endPan);
 
-// ─── Wheel zoom ──────────────────────────────────────────────────────────────
+function buildSpec() {
+  const scenario = currentScenario();
+  const preset = currentPreset();
+  const pixelRatio = state.pixelRatio;
+  const offsetX = Number.isFinite(state.offsetX) ? Math.round(state.offsetX) : 0;
+  const offsetY = Number.isFinite(state.offsetY) ? Math.round(state.offsetY) : 0;
 
-canvas.addEventListener("wheel", e => {
-  e.preventDefault();
-  const factor   = e.deltaY < 0 ? 1.12 : 1 / 1.12;
-  const newZoom  = Math.min(Math.max(state.zoom * factor, 0.15), 8.0);
-  const pt       = toCanvasPt(e);
-  // Keep the canvas point under the cursor fixed:
-  //   pt = worldPos * zoom + offset  →  worldPos = (pt - offset) / zoom
-  //   newOffset = pt - worldPos * newZoom
-  const ratio    = newZoom / state.zoom;
-  state.offsetX  = Math.round(pt.x - (pt.x - state.offsetX) * ratio);
-  state.offsetY  = Math.round(pt.y - (pt.y - state.offsetY) * ratio);
-  state.zoom     = newZoom;
-  render();
-}, { passive: false });
+  return {
+    width: dom.canvas.width,
+    height: dom.canvas.height,
+    title: scenario.title,
+    root_id: scenario.rootId,
+    node_radius: scaleSize(state.nodeRadius, pixelRatio, 1),
+    level_gap: scaleSize(state.levelGap, pixelRatio, 1),
+    sibling_gap: scaleSize(state.siblingGap, pixelRatio, 1),
+    margin: scaleSize(48, pixelRatio, 1),
+    offset_x: offsetX,
+    offset_y: offsetY,
+    pixel_ratio: pixelRatio,
+    selected_node_id: state.selectedNodeId,
+    collapsed_node_ids: state.collapsedNodeIds.slice(),
+    default_node_style: scaleNodeStyle(preset.nodeStyle, pixelRatio),
+    default_edge_style: scaleEdgeStyle(
+      { ...preset.edgeStyle, stroke_width: state.edgeWidth },
+      pixelRatio
+    ),
+    selection_style: scaleSelectionStyle(preset.selectionStyle, pixelRatio),
+    nodes: scenario.nodes.map((node) => ({
+      id: node.id,
+      label: node.label,
+      name: node.name ?? null,
+      color: node.color ?? null,
+      shape: node.shape ?? "circle",
+      label_inside: state.forceLabelInside ? true : Boolean(node.labelInside),
+      style: scaleNodeStyle(node.style, pixelRatio),
+      media: node.media ?? null,
+      properties: node.properties ?? {}
+    })),
+    edges: scenario.edges.map((edge) => ({
+      source: edge.source,
+      target: edge.target,
+      style: scaleEdgeStyle(edge.style, pixelRatio)
+    }))
+  };
+}
 
-// ─── Click to select ─────────────────────────────────────────────────────────
+function supportsSessions() {
+  return typeof wasm.create_tree_session === "function";
+}
 
-canvas.addEventListener("click", e => {
-  if (didDrag) return;
-  const pt = toCanvasPt(e);
+function destroySession() {
+  if (!supportsSessions() || state.sessionHandle == null) {
+    state.sessionHandle = null;
+    return;
+  }
+
   try {
-    const hit = wasm.pick_tree_node(buildSpec(), pt.x, pt.y);
-    state.selectedNodeId = hit?.node_id ?? null;
-    render();
-    renderDetails();
-  } catch (err) {
-    console.error("[tree] pick error:", err);
+    wasm.destroy_tree_session(state.sessionHandle);
+  } finally {
+    state.sessionHandle = null;
   }
-});
+}
 
-// ─── Controls ────────────────────────────────────────────────────────────────
+function normalizeSessionOffsets() {
+  state.offsetX = Number.isFinite(state.offsetX) ? Math.round(state.offsetX) : 0;
+  state.offsetY = Number.isFinite(state.offsetY) ? Math.round(state.offsetY) : 0;
+}
 
-exampleSelect.addEventListener("change", () => switchExample(exampleSelect.value));
+function syncSession() {
+  if (!supportsSessions()) {
+    state.sessionHandle = null;
+    state.sessionDirty = false;
+    return;
+  }
 
-function syncSlider(input, display) {
-  display.textContent = input.value;
+  normalizeSessionOffsets();
+  destroySession();
+  state.sessionHandle = wasm.create_tree_session("tree-canvas", buildSpec());
+  state.sessionDirty = false;
+}
+
+function cancelCollapseAnimation(renderFinal = false) {
+  if (state.transitionFrame != null) {
+    cancelAnimationFrame(state.transitionFrame);
+    state.transitionFrame = null;
+  }
+
+  if (!renderFinal) {
+    return;
+  }
+
+  if (supportsSessions() && state.sessionHandle != null && !state.sessionDirty) {
+    wasm.render_tree_session(state.sessionHandle);
+    return;
+  }
+
+  wasm.render_tree("tree-canvas", buildSpec());
+}
+
+function render() {
+  cancelCollapseAnimation(false);
+  syncCanvasSize();
+
+  try {
+    if (supportsSessions()) {
+      if (state.sessionHandle == null || state.sessionDirty) {
+        syncSession();
+      }
+      wasm.render_tree_session(state.sessionHandle);
+    } else {
+      wasm.render_tree("tree-canvas", buildSpec());
+      state.sessionDirty = false;
+    }
+    if (state.statusKind !== "success") {
+      setStatus(
+        "success",
+        "WASM ready.",
+        "Drag to pan, scroll to zoom, click to inspect, and double-click a node to collapse its descendants."
+      );
+    }
+  } catch (error) {
+    console.error("[tree] render failed", error);
+    setStatus("error", "Tree render failed.", error?.message ?? String(error));
+  }
+}
+
+function applyScenario(nextScenario) {
+  const scenario = SCENARIOS[nextScenario];
+  state.scenario = nextScenario;
+  state.selectedNodeId = null;
+  state.collapsedNodeIds = [];
+  state.offsetX = 0;
+  state.offsetY = 0;
+  state.nodeRadius = scenario.defaults.nodeRadius;
+  state.levelGap = scenario.defaults.levelGap;
+  state.siblingGap = scenario.defaults.siblingGap;
+  state.edgeWidth = scenario.defaults.edgeWidth;
+  state.forceLabelInside = scenario.defaults.forceLabelInside;
+  state.sessionDirty = true;
+
+  syncControls();
+  renderScenarioMeta();
+  renderDetails();
   render();
 }
-radiusInput.addEventListener("input",   () => syncSlider(radiusInput,   radiusVal));
-levelGapInput.addEventListener("input", () => syncSlider(levelGapInput, levelGapVal));
-sibGapInput.addEventListener("input",   () => syncSlider(sibGapInput,   sibGapVal));
 
-shapeBtns.forEach(btn => {
-  btn.addEventListener("click", () => {
-    shapeBtns.forEach(b => b.classList.remove("active"));
-    btn.classList.add("active");
-    const s = btn.dataset.shape;
-    state.shapeOverride = (s === "auto") ? null : s;
+function resetView() {
+  applyScenario(state.scenario);
+}
+
+function setSelection(nodeId) {
+  state.selectedNodeId = nodeId;
+  if (supportsSessions() && state.sessionHandle != null) {
+    wasm.set_tree_selection(state.sessionHandle, nodeId ?? undefined);
+  }
+}
+
+function pickNodeAt(point) {
+  if (supportsSessions() && state.sessionHandle != null && !state.sessionDirty) {
+    return wasm.pick_tree_node_session(state.sessionHandle, point.x, point.y);
+  }
+
+  return wasm.pick_tree_node(buildSpec(), point.x, point.y);
+}
+
+function toggleCollapsedNode(nodeId) {
+  let collapsed = false;
+
+  if (supportsSessions() && state.sessionHandle != null && !state.sessionDirty) {
+    collapsed = wasm.toggle_tree_node_collapsed_session(state.sessionHandle, nodeId);
+  } else {
+    if (!nodeHasChildren(nodeId, currentScenario())) {
+      return false;
+    }
+    const current = new Set(state.collapsedNodeIds);
+    collapsed = !current.has(nodeId);
+  }
+
+  setCollapsedNodeState(nodeId, collapsed);
+  if (
+    collapsed &&
+    state.selectedNodeId &&
+    state.selectedNodeId !== nodeId &&
+    isDescendantOf(nodeId, state.selectedNodeId, currentScenario())
+  ) {
+    state.selectedNodeId = nodeId;
+  }
+
+  return collapsed;
+}
+
+function easeTreeTransition(progress) {
+  if (progress <= 0) {
+    return 0;
+  }
+  if (progress >= 1) {
+    return 1;
+  }
+
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
+
+function animateCollapse(nodeId) {
+  if (!nodeHasChildren(nodeId, currentScenario())) {
+    return;
+  }
+
+  cancelCollapseAnimation(false);
+  toggleCollapsedNode(nodeId);
+  renderDetails();
+
+  if (
+    !supportsSessions() ||
+    state.sessionHandle == null ||
+    state.sessionDirty ||
+    typeof wasm.render_tree_session_transition !== "function"
+  ) {
+    render();
+    return;
+  }
+
+  const start = performance.now();
+  const step = (now) => {
+    const progress = Math.min(1, (now - start) / TREE_COLLAPSE_ANIMATION_MS);
+    wasm.render_tree_session_transition(
+      state.sessionHandle,
+      easeTreeTransition(progress)
+    );
+
+    if (progress < 1) {
+      state.transitionFrame = requestAnimationFrame(step);
+      return;
+    }
+
+    state.transitionFrame = null;
+    render();
+  };
+
+  state.transitionFrame = requestAnimationFrame(step);
+}
+
+function attachControls() {
+  for (const button of dom.scenarioButtons) {
+    button.addEventListener("click", () => applyScenario(button.dataset.scenario));
+  }
+
+  for (const button of dom.presetButtons) {
+    button.addEventListener("click", () => {
+      state.preset = button.dataset.preset;
+      state.sessionDirty = true;
+      renderScenarioMeta();
+      renderDetails();
+      render();
+    });
+  }
+
+  dom.scenarioSelect.addEventListener("change", () => {
+    applyScenario(dom.scenarioSelect.value);
+  });
+
+  dom.nodeRadius.addEventListener("input", () => {
+    state.nodeRadius = Number(dom.nodeRadius.value);
+    dom.nodeRadiusValue.textContent = `${state.nodeRadius}px`;
+    state.sessionDirty = true;
     render();
   });
-});
 
-labelInsideCheck.addEventListener("change", () => {
-  state.labelInside = labelInsideCheck.checked;
-  render();
-});
+  dom.levelGap.addEventListener("input", () => {
+    state.levelGap = Number(dom.levelGap.value);
+    dom.levelGapValue.textContent = `${state.levelGap}px`;
+    state.sessionDirty = true;
+    render();
+  });
 
-prInput.addEventListener("input", () => {
-  const oldPR        = state.pixelRatio;
-  const newPR        = parseFloat(prInput.value);
-  prVal.textContent  = newPR + "×";
-  // Scale offsets so the view position is preserved
-  const ratio        = newPR / oldPR;
-  state.offsetX      = Math.round(state.offsetX * ratio);
-  state.offsetY      = Math.round(state.offsetY * ratio);
-  state.pixelRatio   = newPR;
-  setupCanvas();
-  render();
-});
+  dom.siblingGap.addEventListener("input", () => {
+    state.siblingGap = Number(dom.siblingGap.value);
+    dom.siblingGapValue.textContent = `${state.siblingGap}px`;
+    state.sessionDirty = true;
+    render();
+  });
 
-resetBtn.addEventListener("click", () => {
-  state.offsetX        = 0;
-  state.offsetY        = 0;
-  state.zoom           = 1.0;
-  state.selectedNodeId = null;
-  render();
-  renderDetails();
-});
+  dom.edgeWidth.addEventListener("input", () => {
+    state.edgeWidth = Number(dom.edgeWidth.value);
+    dom.edgeWidthValue.textContent = `${state.edgeWidth}px`;
+    state.sessionDirty = true;
+    render();
+  });
 
-// ─── Boot ────────────────────────────────────────────────────────────────────
+  dom.pixelRatio.addEventListener("input", () => {
+    state.pixelRatio = Number(dom.pixelRatio.value);
+    dom.pixelRatioValue.textContent = `${state.pixelRatio}x`;
+    syncCanvasSize(true);
+    state.sessionDirty = true;
+    render();
+  });
 
-await init();
+  dom.labelInside.addEventListener("change", () => {
+    state.forceLabelInside = dom.labelInside.checked;
+    state.sessionDirty = true;
+    renderDetails();
+    render();
+  });
 
-// Sync pixel-ratio slider to detected device ratio, then set up canvas
-prInput.value         = state.pixelRatio;
-prVal.textContent     = state.pixelRatio + "×";
-setupCanvas();
+  dom.resetButton.addEventListener("click", resetView);
+}
 
-// Apply default params for the initial example
-const p0 = DEFAULT_PARAMS[state.example];
-radiusInput.value   = p0.nodeRadius;
-levelGapInput.value = p0.levelGap;
-sibGapInput.value   = p0.siblingGap;
-radiusVal.textContent   = p0.nodeRadius;
-levelGapVal.textContent = p0.levelGap;
-sibGapVal.textContent   = p0.siblingGap;
+function attachCanvasInteractions() {
+  const drag = {
+    active: false,
+    moved: false,
+    start: { x: 0, y: 0 },
+    last: { x: 0, y: 0 }
+  };
 
-render();
-renderDetails();
+  dom.canvas.addEventListener("pointerdown", (event) => {
+    cancelCollapseAnimation(true);
+    const point = eventPoint(event);
+    drag.active = true;
+    drag.moved = false;
+    drag.start = point;
+    drag.last = point;
+    dom.canvas.setPointerCapture(event.pointerId);
+    dom.canvas.classList.add("is-dragging");
+  });
 
-statusPanel.className = "status-panel status-success";
-const title = statusPanel.querySelector(".status-title");
-const body  = statusPanel.querySelector(".status-body");
-title.textContent = "WASM ready.";
-body.textContent  = "Drag to pan · click a node to select.";
+  dom.canvas.addEventListener("pointermove", (event) => {
+    if (!drag.active) {
+      return;
+    }
+
+    const point = eventPoint(event);
+    const dx = Math.round(point.x - drag.last.x);
+    const dy = Math.round(point.y - drag.last.y);
+
+    if (dx === 0 && dy === 0) {
+      return;
+    }
+
+    drag.last = point;
+    drag.moved =
+      drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 4;
+    state.offsetX += dx;
+    state.offsetY += dy;
+    if (supportsSessions() && state.sessionHandle != null && !state.sessionDirty) {
+      wasm.pan_tree_session(state.sessionHandle, dx, dy);
+      wasm.render_tree_session(state.sessionHandle);
+      return;
+    }
+    render();
+  });
+
+  function finishPointer(event) {
+    if (!drag.active) {
+      return;
+    }
+
+    const point = eventPoint(event);
+    const wasClick =
+      !drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) <= 4;
+
+    drag.active = false;
+    dom.canvas.classList.remove("is-dragging");
+
+    if (dom.canvas.hasPointerCapture(event.pointerId)) {
+      dom.canvas.releasePointerCapture(event.pointerId);
+    }
+
+    if (!wasClick) {
+      return;
+    }
+
+    try {
+      const hit = pickNodeAt(point);
+      setSelection(hit?.node_id ?? null);
+      renderDetails();
+      render();
+    } catch (error) {
+      console.error("[tree] pick failed", error);
+    }
+  }
+
+  dom.canvas.addEventListener("pointerup", finishPointer);
+  dom.canvas.addEventListener("pointercancel", finishPointer);
+  dom.canvas.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+
+    try {
+      const point = eventPoint(event);
+      const hit = pickNodeAt(point);
+      if (!hit?.node_id) {
+        return;
+      }
+
+      animateCollapse(hit.node_id);
+    } catch (error) {
+      console.error("[tree] collapse failed", error);
+    }
+  });
+
+  dom.canvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      cancelCollapseAnimation(true);
+
+      const point = eventPoint(event);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsSessions() && state.sessionHandle != null && !state.sessionDirty) {
+        wasm.zoom_tree_session(state.sessionHandle, point.x, point.y, factor);
+        wasm.render_tree_session(state.sessionHandle);
+        return;
+      }
+      render();
+    },
+    { passive: false }
+  );
+}
+
+async function boot() {
+  try {
+    await init();
+    await preloadGraphImages();
+  } catch (error) {
+    console.error("[tree] wasm init failed", error);
+    setStatus("error", "Unable to load WASM.", error?.message ?? String(error));
+    return;
+  }
+
+  state.pixelRatio = Math.max(1, Math.min(3, Math.round(state.pixelRatio * 2) / 2));
+  syncControls();
+  attachControls();
+  attachCanvasInteractions();
+  applyScenario(state.scenario);
+
+  let resizeFrame = null;
+  const observer = new ResizeObserver(() => {
+    if (resizeFrame != null) {
+      cancelAnimationFrame(resizeFrame);
+    }
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = null;
+      syncCanvasSize(true);
+      state.sessionDirty = true;
+      render();
+    });
+  });
+
+  observer.observe(dom.canvas);
+  window.addEventListener(
+    "beforeunload",
+    () => {
+      observer.disconnect();
+      destroySession();
+    },
+    { once: true }
+  );
+}
+
+boot();

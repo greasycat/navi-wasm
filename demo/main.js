@@ -112,8 +112,8 @@ const initialScatterSpec = {
 const initialTreeSpec = {
   width: 720,
   height: 420,
-  title: "Rooted tree sample",
-  root_id: "root",
+  title: "Stellar lineage preview",
+  root_id: "cloud",
   node_radius: 18,
   level_gap: 88,
   sibling_gap: 40,
@@ -121,78 +121,108 @@ const initialTreeSpec = {
   offset_x: 0,
   offset_y: 0,
   selected_node_id: null,
+  collapsed_node_ids: [],
+  default_edge_style: {
+    stroke_color: "#7b8794",
+    stroke_width: 2
+  },
+  selection_style: {
+    stroke_color: "#c2410c",
+    stroke_width: 3,
+    padding: 8
+  },
   nodes: [
     {
-      id: "root",
-      name: "Gateway Root",
-      label: "root",
-      color: "#0f172a",
+      id: "cloud",
+      name: "Molecular cloud",
+      label: "Cloud",
+      color: "#0f766e",
       shape: "diamond",
       label_inside: true,
-      properties: { tier: "core", region: "us-east", load: "62%" }
+      style: { radius: 24, stroke_color: "#0b3d3a", stroke_width: 2 },
+      properties: { phase: "cold gas", tracer: "CO and dust", note: "root branch" }
     },
     {
-      id: "left",
-      name: "Access West",
-      label: "left",
-      color: "#2563eb",
+      id: "solar",
+      name: "Solar-mass branch",
+      label: "Solar",
+      color: "#d97706",
       shape: "square",
       label_inside: true,
-      properties: { tier: "aggregation", region: "us-west", load: "48%" }
+      properties: { mass: "0.8 - 1.2 Msun", outcome: "white dwarf" }
     },
     {
-      id: "right",
-      name: "Access East",
-      label: "right",
-      color: "#16a34a",
+      id: "massive",
+      name: "Massive-star branch",
+      label: "Massive",
+      color: "#b42318",
       shape: "square",
       label_inside: true,
-      properties: { tier: "aggregation", region: "us-east", load: "51%" }
+      properties: { mass: "> 8 Msun", outcome: "compact remnant" }
     },
     {
-      id: "left-a",
-      name: "Leaf Pine",
-      label: "left-a",
+      id: "ttauri",
+      name: "T Tauri star",
+      label: "T Tauri",
+      color: "#f59e0b",
+      shape: "circle",
+      properties: { phase: "pre-main sequence", tracer: "H alpha" }
+    },
+    {
+      id: "solar-main",
+      name: "Sun-like main sequence star",
+      label: "Solar analog",
       color: "#f97316",
       shape: "circle",
-      label_inside: false,
-      properties: { tier: "edge", region: "oregon", load: "37%" }
+      properties: { phase: "stable burning", duration: "10 Gyr" }
     },
     {
-      id: "left-b",
-      name: "Leaf Cedar",
-      label: "left-b",
-      color: "#eab308",
-      shape: "triangle",
-      label_inside: false,
-      properties: { tier: "edge", region: "california", load: "43%" }
+      id: "white-dwarf",
+      name: "White dwarf",
+      label: "WD",
+      color: "#94a3b8",
+      shape: "diamond",
+      label_inside: true,
+      properties: { phase: "compact remnant", cooling: "long" }
     },
     {
-      id: "right-a",
-      name: "Leaf Birch",
-      label: "right-a",
-      color: "#7c3aed",
+      id: "supergiant",
+      name: "Blue supergiant",
+      label: "Blue SG",
+      color: "#ef4444",
       shape: "circle",
-      label_inside: false,
-      properties: { tier: "edge", region: "virginia", load: "39%" }
+      label_inside: true,
+      properties: { phase: "luminous", wind: "fast" }
     },
     {
-      id: "right-b",
-      name: "Leaf Elm",
-      label: "right-b",
-      color: "#db2777",
-      shape: "triangle",
-      label_inside: false,
-      properties: { tier: "edge", region: "new-york", load: "35%" }
+      id: "collapse",
+      name: "Core-collapse supernova",
+      label: "Collapse",
+      color: "#b42318",
+      shape: "diamond",
+      label_inside: true,
+      style: { radius: 21, stroke_color: "#7f1d1d", stroke_width: 2 },
+      properties: { phase: "explosion", signal: "optical and neutrino" }
+    },
+    {
+      id: "neutron-star",
+      name: "Neutron star",
+      label: "NS",
+      color: "#7c3aed",
+      shape: "square",
+      label_inside: true,
+      properties: { phase: "compact remnant", signal: "X-ray and radio" }
     }
   ],
   edges: [
-    { source: "root", target: "left" },
-    { source: "root", target: "right" },
-    { source: "left", target: "left-a" },
-    { source: "left", target: "left-b" },
-    { source: "right", target: "right-a" },
-    { source: "right", target: "right-b" }
+    { source: "cloud", target: "solar", style: { stroke_color: "#d97706" } },
+    { source: "cloud", target: "massive", style: { stroke_color: "#b42318" } },
+    { source: "solar", target: "ttauri" },
+    { source: "ttauri", target: "solar-main" },
+    { source: "solar-main", target: "white-dwarf", style: { stroke_color: "#94a3b8" } },
+    { source: "massive", target: "supergiant", style: { stroke_color: "#ef4444" } },
+    { source: "supergiant", target: "collapse", style: { stroke_color: "#b42318", stroke_width: 3 } },
+    { source: "collapse", target: "neutron-star", style: { stroke_color: "#7c3aed" } }
   ]
 };
 
@@ -322,8 +352,8 @@ const initialHeatmapSpec = {
 const initialNetworkSpec = {
   width: 720,
   height: 420,
-  title: "Service call graph",
-  node_radius: 20,
+  title: "Transient alert mesh",
+  node_radius: 18,
   margin: 28,
   offset_x: 0,
   offset_y: 0,
@@ -331,26 +361,39 @@ const initialNetworkSpec = {
   layout_iterations: 120,
   show_arrows: true,
   show_labels: true,
+  default_node_style: {
+    stroke_color: "#e6e9ef",
+    stroke_width: 2
+  },
+  default_edge_style: {
+    stroke_color: "#7b8696",
+    stroke_width: 2,
+    label_visible: true
+  },
+  selection_style: {
+    stroke_color: "#d97706",
+    stroke_width: 3,
+    padding: 8
+  },
   nodes: [
-    { id: "client", label: "Client", color: "#0f172a", x: null, y: null, shape: "diamond", label_inside: true, properties: { type: "external", rps: "2400" } },
-    { id: "lb", label: "LB", color: "#2563eb", x: null, y: null, shape: "circle", label_inside: true, properties: { type: "load-balancer", algo: "round-robin" } },
-    { id: "api", label: "API GW", color: "#7c3aed", x: null, y: null, shape: "square", label_inside: true, properties: { type: "gateway", version: "v2.4" } },
-    { id: "auth", label: "Auth", color: "#16a34a", x: null, y: null, shape: "circle", label_inside: true, properties: { type: "service", version: "v1.9" } },
-    { id: "search", label: "Search", color: "#f97316", x: null, y: null, shape: "circle", label_inside: true, properties: { type: "service", version: "v3.1" } },
-    { id: "db", label: "DB", color: "#dc2626", x: null, y: null, shape: "triangle", label_inside: true, properties: { type: "database", engine: "postgres" } },
-    { id: "cache", label: "Cache", color: "#0891b2", x: null, y: null, shape: "square", label_inside: true, properties: { type: "cache", engine: "redis" } },
-    { id: "queue", label: "Queue", color: "#db2777", x: null, y: null, shape: "diamond", label_inside: true, properties: { type: "message-queue", engine: "kafka" } }
+    { id: "ztf", label: "ZTF", color: "#0f766e", x: 72, y: 92, shape: "diamond", label_inside: true, properties: { role: "optical feed", cadence: "minutes" } },
+    { id: "rubin", label: "Rubin", color: "#1d4ed8", x: 90, y: 238, shape: "diamond", label_inside: true, properties: { role: "optical feed", cadence: "nightly" } },
+    { id: "ligo", label: "LIGO", color: "#b42318", x: 124, y: 344, shape: "diamond", label_inside: true, properties: { role: "GW feed", cadence: "event driven" } },
+    { id: "broker", label: "Broker", color: "#111827", x: null, y: null, shape: "square", label_inside: true, style: { radius: 24, stroke_color: "#111827", stroke_width: 2 }, properties: { role: "fan-in", latency: "< 10 s" } },
+    { id: "classifier", label: "Classifier", color: "#7c3aed", x: null, y: null, shape: "circle", label_inside: true, properties: { role: "enrichment", output: "scores" } },
+    { id: "scheduler", label: "Scheduler", color: "#d97706", x: null, y: null, shape: "square", label_inside: true, style: { radius: 21 }, properties: { role: "dispatch", output: "queues" } },
+    { id: "archive", label: "Archive", color: "#475569", x: 520, y: 352, shape: "circle", label_inside: true, properties: { role: "storage", output: "candidate records" } },
+    { id: "circulars", label: "Circulars", color: "#a61b3f", x: 640, y: 90, shape: "circle", label_inside: true, properties: { role: "distribution", output: "community notices" } }
   ],
   edges: [
-    { source: "client", target: "lb", label: null, color: null, weight: null },
-    { source: "lb", target: "api", label: null, color: null, weight: null },
-    { source: "api", target: "auth", label: null, color: null, weight: null },
-    { source: "api", target: "search", label: null, color: null, weight: null },
-    { source: "api", target: "cache", label: null, color: null, weight: null },
-    { source: "search", target: "db", label: null, color: null, weight: null },
-    { source: "search", target: "cache", label: null, color: null, weight: null },
-    { source: "auth", target: "db", label: null, color: null, weight: null },
-    { source: "api", target: "queue", label: null, color: null, weight: null }
+    { source: "ztf", target: "broker", label: "alerts", color: null, weight: null, style: { stroke_color: "#0f766e" } },
+    { source: "rubin", target: "broker", label: "detections", color: null, weight: null, style: { stroke_color: "#1d4ed8" } },
+    { source: "ligo", target: "broker", label: "GW", color: null, weight: null, style: { stroke_color: "#b42318", stroke_width: 3 } },
+    { source: "broker", target: "classifier", label: "triage", color: null, weight: null, style: { stroke_width: 3 } },
+    { source: "broker", target: "scheduler", label: "ranked", color: null, weight: null, style: { stroke_width: 4, stroke_color: "#d97706" } },
+    { source: "classifier", target: "archive", label: "scores", color: null, weight: null, style: { stroke_color: "#7c3aed" } },
+    { source: "scheduler", target: "archive", label: "queues", color: null, weight: null, style: { stroke_color: "#475569" } },
+    { source: "archive", target: "circulars", label: "release", color: null, weight: null, style: { stroke_color: "#a61b3f", stroke_width: 3 } }
   ]
 };
 
@@ -363,7 +406,11 @@ const state = {
   networkSpec: cloneSpec(initialNetworkSpec),
   scatterSessionHandle: null,
   scatterRenderFrame: null,
+  treeSessionHandle: null,
+  treeTransitionFrame: null,
   lineSessionHandle: null,
+  barSessionHandle: null,
+  heatmapSessionHandle: null,
   networkSessionHandle: null,
   scatterPerf: {
     pointCount: initialScatterSpec.points.length,
@@ -371,6 +418,8 @@ const state = {
     mode: "sample"
   }
 };
+
+const TREE_COLLAPSE_ANIMATION_MS = 220;
 
 function setStatus(title, body, kind = "info") {
   statusPanel.className = `status-panel status-${kind}`;
@@ -498,6 +547,20 @@ function supportsScatterSessions(wasm) {
   return typeof wasm.create_scatter_session === "function";
 }
 
+function normalizeViewportOffsets(spec) {
+  if (!spec || typeof spec !== "object") {
+    return;
+  }
+
+  if (Object.hasOwn(spec, "offset_x")) {
+    spec.offset_x = Number.isFinite(spec.offset_x) ? Math.round(spec.offset_x) : 0;
+  }
+
+  if (Object.hasOwn(spec, "offset_y")) {
+    spec.offset_y = Number.isFinite(spec.offset_y) ? Math.round(spec.offset_y) : 0;
+  }
+}
+
 function destroyScatterSession(wasm) {
   if (state.scatterRenderFrame != null) {
     cancelAnimationFrame(state.scatterRenderFrame);
@@ -542,8 +605,65 @@ function renderScatterOnly(wasm) {
   renderScatterMetrics();
 }
 
-function renderTreeOnly(wasm) {
+function supportsTreeSessions(wasm) {
+  return typeof wasm.create_tree_session === "function";
+}
+
+function destroyTreeSession(wasm) {
+  if (state.treeSessionHandle == null || !supportsTreeSessions(wasm)) {
+    state.treeSessionHandle = null;
+    return;
+  }
+
+  try {
+    wasm.destroy_tree_session(state.treeSessionHandle);
+  } finally {
+    state.treeSessionHandle = null;
+  }
+}
+
+function syncTreeSession(wasm) {
+  if (!supportsTreeSessions(wasm)) {
+    state.treeSessionHandle = null;
+    return;
+  }
+
+  normalizeViewportOffsets(state.treeSpec);
+  destroyTreeSession(wasm);
+  state.treeSessionHandle = wasm.create_tree_session("tree-canvas", state.treeSpec);
+}
+
+function cancelTreeTransition(wasm, renderFinal = false) {
+  if (state.treeTransitionFrame != null) {
+    cancelAnimationFrame(state.treeTransitionFrame);
+    state.treeTransitionFrame = null;
+  }
+
+  if (!renderFinal) {
+    return;
+  }
+
+  if (supportsTreeSessions(wasm)) {
+    if (state.treeSessionHandle == null) {
+      syncTreeSession(wasm);
+    }
+    wasm.render_tree_session(state.treeSessionHandle);
+    return;
+  }
+
   wasm.render_tree("tree-canvas", state.treeSpec);
+}
+
+function renderTreeOnly(wasm) {
+  cancelTreeTransition(wasm, false);
+  if (supportsTreeSessions(wasm)) {
+    if (state.treeSessionHandle == null) {
+      syncTreeSession(wasm);
+    }
+    wasm.render_tree_session(state.treeSessionHandle);
+  } else {
+    wasm.render_tree("tree-canvas", state.treeSpec);
+  }
 }
 
 function scheduleScatterRender(wasm) {
@@ -629,6 +749,159 @@ function renderScatterMetrics() {
     `${state.scatterPerf.mode} dataset · ${state.scatterPerf.pointCount.toLocaleString()} points · last scatter render ${state.scatterPerf.renderMs.toFixed(1)} ms`;
 }
 
+function buildTreeAdjacency(spec) {
+  const children = new Map();
+  const parent = new Map();
+
+  for (const node of spec.nodes) {
+    children.set(node.id, []);
+  }
+
+  for (const edge of spec.edges) {
+    children.get(edge.source)?.push(edge.target);
+    parent.set(edge.target, edge.source);
+  }
+
+  return { children, parent };
+}
+
+function countTreeDescendants(spec, nodeId) {
+  const { children } = buildTreeAdjacency(spec);
+  let count = 0;
+  const queue = [...(children.get(nodeId) ?? [])];
+
+  while (queue.length) {
+    const current = queue.shift();
+    count += 1;
+    queue.push(...(children.get(current) ?? []));
+  }
+
+  return count;
+}
+
+function treeNodeHasChildren(spec, nodeId) {
+  const { children } = buildTreeAdjacency(spec);
+  return (children.get(nodeId) ?? []).length > 0;
+}
+
+function isTreeDescendant(spec, ancestorId, nodeId) {
+  if (!ancestorId || !nodeId || ancestorId === nodeId) {
+    return false;
+  }
+
+  const { parent } = buildTreeAdjacency(spec);
+  let cursor = parent.get(nodeId) ?? null;
+  while (cursor) {
+    if (cursor === ancestorId) {
+      return true;
+    }
+    cursor = parent.get(cursor) ?? null;
+  }
+
+  return false;
+}
+
+function setTreeNodeCollapsedState(nodeId, collapsed) {
+  const next = new Set(state.treeSpec.collapsed_node_ids ?? []);
+  if (collapsed) {
+    next.add(nodeId);
+  } else {
+    next.delete(nodeId);
+  }
+  state.treeSpec.collapsed_node_ids = [...next];
+}
+
+function pickTreeNodeAt(wasm, point) {
+  if (supportsTreeSessions(wasm)) {
+    if (state.treeSessionHandle == null) {
+      syncTreeSession(wasm);
+    }
+    return wasm.pick_tree_node_session(state.treeSessionHandle, point.x, point.y);
+  }
+
+  return wasm.pick_tree_node(state.treeSpec, point.x, point.y);
+}
+
+function toggleTreeNodeCollapsed(wasm, nodeId) {
+  let collapsed = false;
+
+  if (supportsTreeSessions(wasm)) {
+    if (state.treeSessionHandle == null) {
+      syncTreeSession(wasm);
+    }
+    collapsed = wasm.toggle_tree_node_collapsed_session(state.treeSessionHandle, nodeId);
+  } else {
+    if (!treeNodeHasChildren(state.treeSpec, nodeId)) {
+      return false;
+    }
+    const current = new Set(state.treeSpec.collapsed_node_ids ?? []);
+    collapsed = !current.has(nodeId);
+  }
+
+  setTreeNodeCollapsedState(nodeId, collapsed);
+  if (
+    collapsed &&
+    state.treeSpec.selected_node_id &&
+    state.treeSpec.selected_node_id !== nodeId &&
+    isTreeDescendant(state.treeSpec, nodeId, state.treeSpec.selected_node_id)
+  ) {
+    state.treeSpec.selected_node_id = nodeId;
+  }
+
+  return collapsed;
+}
+
+function easeTreeTransition(progress) {
+  if (progress <= 0) {
+    return 0;
+  }
+  if (progress >= 1) {
+    return 1;
+  }
+
+  return progress < 0.5
+    ? 4 * progress * progress * progress
+    : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+}
+
+function animateTreeCollapse(wasm, nodeId) {
+  if (!treeNodeHasChildren(state.treeSpec, nodeId)) {
+    return;
+  }
+
+  cancelTreeTransition(wasm, false);
+  toggleTreeNodeCollapsed(wasm, nodeId);
+  renderTreeDetails();
+
+  if (
+    !supportsTreeSessions(wasm) ||
+    state.treeSessionHandle == null ||
+    typeof wasm.render_tree_session_transition !== "function"
+  ) {
+    renderTreeOnly(wasm);
+    return;
+  }
+
+  const start = performance.now();
+  const step = (now) => {
+    const progress = Math.min(1, (now - start) / TREE_COLLAPSE_ANIMATION_MS);
+    wasm.render_tree_session_transition(
+      state.treeSessionHandle,
+      easeTreeTransition(progress)
+    );
+
+    if (progress < 1) {
+      state.treeTransitionFrame = requestAnimationFrame(step);
+      return;
+    }
+
+    state.treeTransitionFrame = null;
+    renderTreeOnly(wasm);
+  };
+
+  state.treeTransitionFrame = requestAnimationFrame(step);
+}
+
 function renderTreeDetails() {
   const nodeId = state.treeSpec.selected_node_id;
   const node = state.treeSpec.nodes.find((entry) => entry.id === nodeId);
@@ -641,10 +914,13 @@ function renderTreeDetails() {
     return;
   }
 
-  const childCount = state.treeSpec.edges.filter((edge) => edge.source === node.id).length;
+  const { children } = buildTreeAdjacency(state.treeSpec);
+  const childCount = (children.get(node.id) ?? []).length;
+  const descendantCount = countTreeDescendants(state.treeSpec, node.id);
+  const collapsed = (state.treeSpec.collapsed_node_ids ?? []).includes(node.id);
   treeDetails.innerHTML = `
     <h3>${selectionName(node, node.id)}</h3>
-    <p class="details-meta">ID ${node.id} · label ${node.label} · children ${childCount}</p>
+    <p class="details-meta">ID ${node.id} · label ${node.label} · children ${childCount} · descendants ${descendantCount} · ${collapsed ? "collapsed" : "expanded"}</p>
     ${renderProperties({
       ...node.properties,
       color: node.color ?? "default"
@@ -659,8 +935,11 @@ function setScatterSelection(wasm, index) {
   }
 }
 
-function setTreeSelection(nodeId) {
+function setTreeSelection(wasm, nodeId) {
   state.treeSpec.selected_node_id = nodeId;
+  if (supportsTreeSessions(wasm) && state.treeSessionHandle != null) {
+    wasm.set_tree_selection(state.treeSessionHandle, nodeId ?? undefined);
+  }
 }
 
 // ── Line chart ────────────────────────────────────────────────────────────────
@@ -791,6 +1070,20 @@ function attachLineInteractions(wasm) {
   lineCanvas.addEventListener("pointerup", finishLinePointer);
   lineCanvas.addEventListener("pointercancel", finishLinePointer);
 
+  lineCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventPoint(event, lineCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsLineSessions(wasm)) {
+        wasm.zoom_line_session(state.lineSessionHandle, point.x, point.y, factor);
+      }
+      renderLineOnly(wasm);
+    },
+    { passive: false }
+  );
+
   lineReset.addEventListener("click", () => {
     state.lineSpec = cloneSpec(initialLineSpec);
     syncLineSession(wasm);
@@ -801,8 +1094,42 @@ function attachLineInteractions(wasm) {
 
 // ── Bar chart ─────────────────────────────────────────────────────────────────
 
+function supportsBarSessions(wasm) {
+  return typeof wasm.create_bar_session === "function";
+}
+
+function destroyBarSession(wasm) {
+  if (state.barSessionHandle == null || !supportsBarSessions(wasm)) {
+    state.barSessionHandle = null;
+    return;
+  }
+
+  try {
+    wasm.destroy_bar_session(state.barSessionHandle);
+  } finally {
+    state.barSessionHandle = null;
+  }
+}
+
+function syncBarSession(wasm) {
+  if (!supportsBarSessions(wasm)) {
+    state.barSessionHandle = null;
+    return;
+  }
+
+  destroyBarSession(wasm);
+  state.barSessionHandle = wasm.create_bar_session("bar-canvas", state.barSpec);
+}
+
 function renderBarOnly(wasm) {
-  wasm.render_bar("bar-canvas", state.barSpec);
+  if (supportsBarSessions(wasm)) {
+    if (state.barSessionHandle == null) {
+      syncBarSession(wasm);
+    }
+    wasm.render_bar_session(state.barSessionHandle);
+  } else {
+    wasm.render_bar("bar-canvas", state.barSpec);
+  }
 }
 
 function renderBarDetails() {
@@ -833,27 +1160,60 @@ function renderBarDetails() {
   barDetails.replaceChildren(heading, meta, buildPropertyList({ series: series.label, category, value: String(series.values[ci]) }));
 }
 
+function setBarSelection(wasm, seriesIndex, categoryIndex) {
+  state.barSpec.selected_bar =
+    seriesIndex != null && categoryIndex != null ? [seriesIndex, categoryIndex] : null;
+  if (supportsBarSessions(wasm) && state.barSessionHandle != null) {
+    wasm.set_bar_selection(
+      state.barSessionHandle,
+      seriesIndex != null ? seriesIndex : undefined,
+      categoryIndex != null ? categoryIndex : undefined
+    );
+  }
+}
+
 function attachBarInteractions(wasm) {
   barCanvas.addEventListener("click", (event) => {
     const point = eventPoint(event, barCanvas);
-    const hit = wasm.pick_bar(state.barSpec, point.x, point.y);
-    state.barSpec.selected_bar = hit ? [hit.series_index, hit.category_index] : null;
+    const hit = supportsBarSessions(wasm)
+      ? wasm.pick_bar_session(state.barSessionHandle, point.x, point.y)
+      : wasm.pick_bar(state.barSpec, point.x, point.y);
+    setBarSelection(wasm, hit?.series_index ?? null, hit?.category_index ?? null);
     renderBarOnly(wasm);
     renderBarDetails();
   });
 
+  barCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventPoint(event, barCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsBarSessions(wasm)) {
+        wasm.zoom_bar_session(state.barSessionHandle, point.x, point.y, factor);
+      }
+      renderBarOnly(wasm);
+    },
+    { passive: false }
+  );
+
   barGroupedButton.addEventListener("click", () => {
     state.barSpec.variant = "grouped";
+    syncBarSession(wasm);
     renderBarOnly(wasm);
+    renderBarDetails();
   });
 
   barStackedButton.addEventListener("click", () => {
     state.barSpec.variant = "stacked";
+    syncBarSession(wasm);
     renderBarOnly(wasm);
+    renderBarDetails();
   });
 
   barReset.addEventListener("click", () => {
     state.barSpec = cloneSpec(initialBarSpec);
+    syncBarSession(wasm);
     renderBarOnly(wasm);
     renderBarDetails();
   });
@@ -861,8 +1221,42 @@ function attachBarInteractions(wasm) {
 
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 
+function supportsHeatmapSessions(wasm) {
+  return typeof wasm.create_heatmap_session === "function";
+}
+
+function destroyHeatmapSession(wasm) {
+  if (state.heatmapSessionHandle == null || !supportsHeatmapSessions(wasm)) {
+    state.heatmapSessionHandle = null;
+    return;
+  }
+
+  try {
+    wasm.destroy_heatmap_session(state.heatmapSessionHandle);
+  } finally {
+    state.heatmapSessionHandle = null;
+  }
+}
+
+function syncHeatmapSession(wasm) {
+  if (!supportsHeatmapSessions(wasm)) {
+    state.heatmapSessionHandle = null;
+    return;
+  }
+
+  destroyHeatmapSession(wasm);
+  state.heatmapSessionHandle = wasm.create_heatmap_session("heatmap-canvas", state.heatmapSpec);
+}
+
 function renderHeatmapOnly(wasm) {
-  wasm.render_heatmap("heatmap-canvas", state.heatmapSpec);
+  if (supportsHeatmapSessions(wasm)) {
+    if (state.heatmapSessionHandle == null) {
+      syncHeatmapSession(wasm);
+    }
+    wasm.render_heatmap_session(state.heatmapSessionHandle);
+  } else {
+    wasm.render_heatmap("heatmap-canvas", state.heatmapSpec);
+  }
 }
 
 function renderHeatmapDetails() {
@@ -894,28 +1288,61 @@ function renderHeatmapDetails() {
   heatmapDetails.replaceChildren(heading, meta, buildPropertyList({ row: rowLabel, column: colLabel, value: String(value) }));
 }
 
+function setHeatmapSelection(wasm, row, col) {
+  state.heatmapSpec.selected_cell = row != null && col != null ? [row, col] : null;
+  if (supportsHeatmapSessions(wasm) && state.heatmapSessionHandle != null) {
+    wasm.set_heatmap_selection(
+      state.heatmapSessionHandle,
+      row != null ? row : undefined,
+      col != null ? col : undefined
+    );
+  }
+}
+
 function attachHeatmapInteractions(wasm) {
   heatmapCanvas.addEventListener("click", (event) => {
     const point = eventPoint(event, heatmapCanvas);
-    const hit = wasm.pick_heatmap_cell(state.heatmapSpec, point.x, point.y);
-    state.heatmapSpec.selected_cell = hit ? [hit.row, hit.col] : null;
+    const hit = supportsHeatmapSessions(wasm)
+      ? wasm.pick_heatmap_cell_session(state.heatmapSessionHandle, point.x, point.y)
+      : wasm.pick_heatmap_cell(state.heatmapSpec, point.x, point.y);
+    setHeatmapSelection(wasm, hit?.row ?? null, hit?.col ?? null);
     renderHeatmapOnly(wasm);
     renderHeatmapDetails();
   });
 
+  heatmapCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventPoint(event, heatmapCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsHeatmapSessions(wasm)) {
+        wasm.zoom_heatmap_session(state.heatmapSessionHandle, point.x, point.y, factor);
+      }
+      renderHeatmapOnly(wasm);
+    },
+    { passive: false }
+  );
+
   heatmapBwrButton.addEventListener("click", () => {
     state.heatmapSpec.palette = "blue_white_red";
+    syncHeatmapSession(wasm);
     renderHeatmapOnly(wasm);
+    renderHeatmapDetails();
   });
 
   heatmapViridisButton.addEventListener("click", () => {
     state.heatmapSpec.palette = "viridis";
+    syncHeatmapSession(wasm);
     renderHeatmapOnly(wasm);
+    renderHeatmapDetails();
   });
 
   heatmapGreensButton.addEventListener("click", () => {
     state.heatmapSpec.palette = "greens";
+    syncHeatmapSession(wasm);
     renderHeatmapOnly(wasm);
+    renderHeatmapDetails();
   });
 }
 
@@ -942,6 +1369,8 @@ function syncNetworkSession(wasm) {
     state.networkSessionHandle = null;
     return;
   }
+
+  normalizeViewportOffsets(state.networkSpec);
   destroyNetworkSession(wasm);
   state.networkSessionHandle = wasm.create_network_session("network-canvas", state.networkSpec);
 }
@@ -1037,6 +1466,20 @@ function attachNetworkInteractions(wasm) {
   networkCanvas.addEventListener("pointerup", finishNetworkPointer);
   networkCanvas.addEventListener("pointercancel", finishNetworkPointer);
 
+  networkCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventPoint(event, networkCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsNetworkSessions(wasm)) {
+        wasm.zoom_network_session(state.networkSessionHandle, point.x, point.y, factor);
+      }
+      renderNetworkOnly(wasm);
+    },
+    { passive: false }
+  );
+
   networkReset.addEventListener("click", () => {
     state.networkSpec = cloneSpec(initialNetworkSpec);
     syncNetworkSession(wasm);
@@ -1050,10 +1493,13 @@ function attachNetworkInteractions(wasm) {
 function renderInitialScene(wasm) {
   syncScatterSession(wasm);
   renderScatterOnly(wasm);
+  syncTreeSession(wasm);
   renderTreeOnly(wasm);
   syncLineSession(wasm);
   renderLineOnly(wasm);
+  syncBarSession(wasm);
   renderBarOnly(wasm);
+  syncHeatmapSession(wasm);
   renderHeatmapOnly(wasm);
   syncNetworkSession(wasm);
   renderNetworkOnly(wasm);
@@ -1163,6 +1609,20 @@ function attachScatterInteractions(wasm) {
   scatterCanvas.addEventListener("pointerup", finishPointer);
   scatterCanvas.addEventListener("pointercancel", finishPointer);
 
+  scatterCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      const point = eventPoint(event, scatterCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsScatterSessions(wasm)) {
+        wasm.zoom_scatter_session(state.scatterSessionHandle, point.x, point.y, factor);
+      }
+      scheduleScatterRender(wasm);
+    },
+    { passive: false }
+  );
+
   scatterReset.addEventListener("click", () => {
     state.scatterSpec = cloneSpec(initialScatterSpec);
     state.scatterPerf.mode = "sample";
@@ -1192,6 +1652,7 @@ function attachTreeInteractions(wasm) {
   };
 
   treeCanvas.addEventListener("pointerdown", (event) => {
+    cancelTreeTransition(wasm, true);
     const point = eventPoint(event, treeCanvas);
     dragState.active = true;
     dragState.moved = false;
@@ -1215,7 +1676,11 @@ function attachTreeInteractions(wasm) {
 
     dragState.last = point;
     dragState.moved = dragState.moved || Math.hypot(point.x - dragState.start.x, point.y - dragState.start.y) > 4;
-    state.treeSpec = wasm.pan_tree(state.treeSpec, dx, dy);
+    if (supportsTreeSessions(wasm)) {
+      wasm.pan_tree_session(state.treeSessionHandle, dx, dy);
+    } else {
+      state.treeSpec = wasm.pan_tree(state.treeSpec, dx, dy);
+    }
     renderTreeOnly(wasm);
   });
 
@@ -1234,8 +1699,8 @@ function attachTreeInteractions(wasm) {
     }
 
     if (wasClick) {
-      const hit = wasm.pick_tree_node(state.treeSpec, point.x, point.y);
-      setTreeSelection(hit?.node_id ?? null);
+      const hit = pickTreeNodeAt(wasm, point);
+      setTreeSelection(wasm, hit?.node_id ?? null);
       renderTreeOnly(wasm);
       renderTreeDetails();
     }
@@ -1243,9 +1708,36 @@ function attachTreeInteractions(wasm) {
 
   treeCanvas.addEventListener("pointerup", finishPointer);
   treeCanvas.addEventListener("pointercancel", finishPointer);
+  treeCanvas.addEventListener("dblclick", (event) => {
+    event.preventDefault();
+    const point = eventPoint(event, treeCanvas);
+    const hit = pickTreeNodeAt(wasm, point);
+    if (!hit?.node_id) {
+      return;
+    }
+
+    animateTreeCollapse(wasm, hit.node_id);
+  });
+
+  treeCanvas.addEventListener(
+    "wheel",
+    (event) => {
+      event.preventDefault();
+      cancelTreeTransition(wasm, true);
+      const point = eventPoint(event, treeCanvas);
+      const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
+      if (supportsTreeSessions(wasm)) {
+        wasm.zoom_tree_session(state.treeSessionHandle, point.x, point.y, factor);
+      }
+      renderTreeOnly(wasm);
+    },
+    { passive: false }
+  );
 
   treeReset.addEventListener("click", () => {
+    cancelTreeTransition(wasm, false);
     state.treeSpec = cloneSpec(initialTreeSpec);
+    syncTreeSession(wasm);
     renderTreeOnly(wasm);
     renderTreeDetails();
   });
@@ -1261,7 +1753,10 @@ function bootInteractiveDemo(wasm) {
   attachNetworkInteractions(wasm);
   window.addEventListener("beforeunload", () => {
     destroyScatterSession(wasm);
+    destroyTreeSession(wasm);
     destroyLineSession(wasm);
+    destroyBarSession(wasm);
+    destroyHeatmapSession(wasm);
     destroyNetworkSession(wasm);
   }, { once: true });
 }

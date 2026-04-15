@@ -15,12 +15,12 @@ const POINT_RADIUS: i32 = 4;
 
 /// Default series color palette (cycles by index).
 const SERIES_PALETTE: [RGBColor; 6] = [
-    RGBColor(37, 99, 235),   // blue
-    RGBColor(22, 163, 74),   // green
-    RGBColor(220, 38, 38),   // red
-    RGBColor(249, 115, 22),  // orange
-    RGBColor(147, 51, 234),  // purple
-    RGBColor(15, 118, 110),  // teal
+    RGBColor(37, 99, 235),  // blue
+    RGBColor(22, 163, 74),  // green
+    RGBColor(220, 38, 38),  // red
+    RGBColor(249, 115, 22), // orange
+    RGBColor(147, 51, 234), // purple
+    RGBColor(15, 118, 110), // teal
 ];
 
 type LineCoordSpec = Cartesian2d<RangedCoordf64, RangedCoordf64>;
@@ -141,6 +141,7 @@ impl LineSession {
                         resolved
                             .points
                             .iter()
+                            .filter(|&&(x, y)| point_overlaps_plot_area(&self.viewport, (x, y), 0))
                             .map(|&pt| Circle::new(pt, POINT_RADIUS, color.filled())),
                     )
                     .map_err(backend_error)?;
@@ -161,16 +162,18 @@ impl LineSession {
         if let Some([si, pi]) = self.spec.selected_point {
             if let Some(resolved) = self.series.get(si) {
                 if let Some(&pt) = resolved.points.get(pi) {
-                    chart
-                        .draw_series(std::iter::once(
-                            EmptyElement::at(pt)
-                                + Circle::new(
-                                    (0, 0),
-                                    POINT_RADIUS + SELECTION_RING_PADDING,
-                                    ShapeStyle::from(&BLACK.mix(0.9)).stroke_width(2),
-                                ),
-                        ))
-                        .map_err(backend_error)?;
+                    if point_overlaps_plot_area(&self.viewport, pt, SELECTION_RING_PADDING) {
+                        chart
+                            .draw_series(std::iter::once(
+                                EmptyElement::at(pt)
+                                    + Circle::new(
+                                        (0, 0),
+                                        POINT_RADIUS + SELECTION_RING_PADDING,
+                                        ShapeStyle::from(&BLACK.mix(0.9)).stroke_width(2),
+                                    ),
+                            ))
+                            .map_err(backend_error)?;
+                    }
                 }
             }
         }
@@ -189,11 +192,15 @@ impl LineSession {
         self.flat_points
             .iter()
             .filter_map(|p| {
+                if !point_overlaps_plot_area(&self.viewport, (p.x, p.y), SELECTION_RING_PADDING) {
+                    return None;
+                }
                 let center = self.viewport.translate((p.x, p.y));
                 let dx = f64::from(center.0 - target.0);
                 let dy = f64::from(center.1 - target.1);
                 let dist_sq = dx * dx + dy * dy;
-                (dist_sq <= threshold * threshold).then_some(([p.series_index, p.point_index], dist_sq))
+                (dist_sq <= threshold * threshold)
+                    .then_some(([p.series_index, p.point_index], dist_sq))
             })
             .min_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(idx, _)| idx)
@@ -228,10 +235,16 @@ impl LineSession {
         self.spec.y_range = Some([next_y.0, next_y.1]);
     }
 
+    pub fn zoom_at(&mut self, canvas_x: f64, canvas_y: f64, factor: f64) -> Result<(), PlotError> {
+        self.viewport.zoom_at(canvas_x, canvas_y, factor)?;
+        self.spec.x_range = Some([self.viewport.x_range.0, self.viewport.x_range.1]);
+        self.spec.y_range = Some([self.viewport.y_range.0, self.viewport.y_range.1]);
+        Ok(())
+    }
+
     pub fn set_selection(&mut self, index: Option<[usize; 2]>) {
-        self.spec.selected_point = index.filter(|[si, pi]| {
-            self.series.get(*si).is_some_and(|s| *pi < s.points.len())
-        });
+        self.spec.selected_point =
+            index.filter(|[si, pi]| self.series.get(*si).is_some_and(|s| *pi < s.points.len()));
     }
 
     pub fn spec(&self) -> &LinePlotSpec {
@@ -249,6 +262,17 @@ impl LineSession {
     pub fn height(&self) -> u32 {
         self.spec.height
     }
+}
+
+fn point_overlaps_plot_area(
+    viewport: &CartesianViewport,
+    point: (f64, f64),
+    extra_radius: i32,
+) -> bool {
+    let center = viewport.translate(point);
+    viewport
+        .plot_bounds
+        .intersects_circle(center, POINT_RADIUS + extra_radius.max(0))
 }
 
 pub fn render_line_on<DB>(root: PlotArea<DB>, spec: &LinePlotSpec) -> Result<(), PlotError>
@@ -389,9 +413,24 @@ mod tests {
                     color: Some("#2563eb".to_string()),
                     stroke_width: 2,
                     points: vec![
-                        LinePoint { x: 1.0, y: 2.0, label: None, properties: Default::default() },
-                        LinePoint { x: 2.0, y: 4.0, label: None, properties: Default::default() },
-                        LinePoint { x: 3.0, y: 3.0, label: None, properties: Default::default() },
+                        LinePoint {
+                            x: 1.0,
+                            y: 2.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
+                        LinePoint {
+                            x: 2.0,
+                            y: 4.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
+                        LinePoint {
+                            x: 3.0,
+                            y: 3.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
                     ],
                 },
                 LineSeriesSpec {
@@ -399,9 +438,24 @@ mod tests {
                     color: Some("#16a34a".to_string()),
                     stroke_width: 2,
                     points: vec![
-                        LinePoint { x: 1.0, y: 5.0, label: None, properties: Default::default() },
-                        LinePoint { x: 2.0, y: 3.0, label: None, properties: Default::default() },
-                        LinePoint { x: 3.0, y: 6.0, label: None, properties: Default::default() },
+                        LinePoint {
+                            x: 1.0,
+                            y: 5.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
+                        LinePoint {
+                            x: 2.0,
+                            y: 3.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
+                        LinePoint {
+                            x: 3.0,
+                            y: 6.0,
+                            label: None,
+                            properties: Default::default(),
+                        },
                     ],
                 },
             ],
@@ -430,7 +484,14 @@ mod tests {
     #[test]
     fn line_invalid_explicit_range_is_rejected() {
         let err = resolve_axis_range("x", Some([3.0, 3.0]), 0.0, 1.0).unwrap_err();
-        assert_eq!(err, PlotError::InvalidRange { axis: "x", min: 3.0, max: 3.0 });
+        assert_eq!(
+            err,
+            PlotError::InvalidRange {
+                axis: "x",
+                min: 3.0,
+                max: 3.0
+            }
+        );
     }
 
     #[test]
@@ -453,22 +514,24 @@ mod tests {
     fn line_svg_output_contains_path_per_series() {
         let mut svg = String::new();
         let spec = sample_spec();
-        let area =
-            SVGBackend::with_string(&mut svg, (spec.width, spec.height)).into_drawing_area();
+        let area = SVGBackend::with_string(&mut svg, (spec.width, spec.height)).into_drawing_area();
         render_line_on(area, &spec).unwrap();
         // Plotters SVG renders line series as <polyline elements
         let polyline_count = svg.matches("<polyline").count();
-        assert!(polyline_count >= spec.series.len(),
+        assert!(
+            polyline_count >= spec.series.len(),
             "expected >= {} polylines, got {}: SVG={}",
-            spec.series.len(), polyline_count, &svg[..svg.len().min(500)]);
+            spec.series.len(),
+            polyline_count,
+            &svg[..svg.len().min(500)]
+        );
     }
 
     #[test]
     fn line_svg_output_contains_circles_when_show_points_true() {
         let mut svg = String::new();
         let spec = sample_spec();
-        let area =
-            SVGBackend::with_string(&mut svg, (spec.width, spec.height)).into_drawing_area();
+        let area = SVGBackend::with_string(&mut svg, (spec.width, spec.height)).into_drawing_area();
         render_line_on(area, &spec).unwrap();
         let total_points: usize = spec.series.iter().map(|s| s.points.len()).sum();
         assert_eq!(svg.matches("<circle").count(), total_points);
@@ -482,6 +545,19 @@ mod tests {
         let px = session.viewport.translate((1.0, 5.0));
         let hit = session.pick_point(f64::from(px.0), f64::from(px.1));
         assert_eq!(hit, Some([1, 0]));
+    }
+
+    #[test]
+    fn line_hit_test_ignores_offscreen_points() {
+        let mut spec = sample_spec();
+        spec.x_range = Some([0.0, 0.5]);
+        spec.y_range = Some([0.0, 2.0]);
+
+        let session = LineSession::new(spec).unwrap();
+        let px = session.viewport.translate((1.0, 5.0));
+        let hit = session.pick_point(f64::from(px.0), f64::from(px.1));
+
+        assert_eq!(hit, None);
     }
 
     #[test]

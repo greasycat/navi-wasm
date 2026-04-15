@@ -1,0 +1,33 @@
+body.explorer-network {
+  --page-bg: #f7f7fa;
+  --page-bg-alt: #eef2f7;
+  --surface: #ffffff;
+  --surface-alt: #f5f6fa;
+  --surface-line: #dadde6;
+  --control-bg: #f7f8fc;
+  --stage-top: #fbfbfe;
+  --stage-bottom: #f1f4f8;
+  --text: #191d28;
+  --muted: #5f6576;
+  --accent: #a61b3f;
+  --accent-soft: #f9e6ec;
+  --accent-ink: #8d1535;
+}
+
+.explorer-network .eyebrow {
+  color: #0f766e;
+}
+
+.explorer-network .stage-kicker {
+  color: #0f766e;
+}
+
+.explorer-network .stage-frame {
+  background:
+    linear-gradient(180deg, rgba(166, 27, 63, 0.05), transparent 38%),
+    linear-gradient(180deg, var(--stage-top), var(--stage-bottom));
+}
+
+.explorer-network .legend-swatch {
+  border: 1px solid rgba(25, 29, 40, 0.1);
+}

@@ -1,10 +1,10 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use axum::{
-    Router,
     extract::Request,
     middleware::{self, Next},
     response::Response,
+    Router,
 };
 use tower_http::services::ServeDir;
 use tracing::info;

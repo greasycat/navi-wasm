@@ -49,6 +49,86 @@ export interface ScatterPlotSpec {
  */
 export type NodeShape = "circle" | "square" | "diamond" | "triangle";
 
+export type BuiltinNodeIcon =
+  | "star"
+  | "galaxy"
+  | "planet"
+  | "moon"
+  | "telescope"
+  | "camera"
+  | "alert"
+  | "archive"
+  | "database"
+  | "broker"
+  | "dish"
+  | "spectrograph";
+
+export type NodeMediaFit = "contain" | "cover";
+
+export interface NodeMedia {
+  kind: "icon" | "image";
+  /** Required when `kind` is `"icon"`. */
+  icon?: BuiltinNodeIcon | null;
+  /** Required when `kind` is `"image"`. Use a key registered with `register_graph_image`. */
+  image_key?: string | null;
+  /** Image scaling mode inside the node bounds. Default: `"contain"`. */
+  fit?: NodeMediaFit | null;
+  /** Relative media size within the node. Valid range: `0.2..=1.0`. Default: `0.7`. */
+  scale?: number | null;
+  /** Tint color for built-in icons. CSS hex. Default: white. */
+  tint_color?: string | null;
+  /** Built-in icon shown if an image key is missing or the backend cannot draw images. */
+  fallback_icon?: BuiltinNodeIcon | null;
+}
+
+export interface GraphNodeStyle {
+  /** Node fill color. CSS hex, e.g. "#3b82f6". */
+  fill_color?: string | null;
+  /** Optional outline color. Defaults to the fill color when stroke_width is set. */
+  stroke_color?: string | null;
+  /** Outline width in pixels. 0 disables the outline. */
+  stroke_width?: number | null;
+  /** Node radius in canvas pixels. Must be at least 1. */
+  radius?: number | null;
+  /** Opacity applied to the node fill, outline, and label. Range: 0..1. */
+  opacity?: number | null;
+  shape?: NodeShape | null;
+  /** Controls whether the label is drawn for this node. */
+  label_visible?: boolean | null;
+  /** Label text color. Defaults to white for inside labels and black for outside labels. */
+  label_color?: string | null;
+  /** Render the label centered inside the node shape instead of below it. */
+  label_inside?: boolean | null;
+}
+
+export interface GraphEdgeStyle {
+  /** Edge stroke color. CSS hex, e.g. "#64748b". */
+  stroke_color?: string | null;
+  /** Edge stroke width in pixels. 0 hides the line. */
+  stroke_width?: number | null;
+  /** Alternating draw / gap lengths in pixels, e.g. [6, 4] for dashed lines. */
+  dash_pattern?: number[] | null;
+  /** Opacity applied to the edge stroke, arrowhead, and label. Range: 0..1. */
+  opacity?: number | null;
+  /** Override arrowhead visibility. Ignored for tree graphs. */
+  arrow_visible?: boolean | null;
+  /** Controls whether the edge label is drawn when one exists. */
+  label_visible?: boolean | null;
+  /** Edge label text color. Defaults to the resolved stroke color. */
+  label_color?: string | null;
+}
+
+export interface SelectionStyle {
+  /** Selection ring stroke color. CSS hex. */
+  stroke_color?: string | null;
+  /** Selection ring stroke width in pixels. 0 hides the ring. */
+  stroke_width?: number | null;
+  /** Extra padding between the node radius and the selection ring radius. */
+  padding?: number | null;
+  /** Opacity applied to the selection ring. Range: 0..1. */
+  opacity?: number | null;
+}
+
 // ─── Tree ─────────────────────────────────────────────────────────────────────
 
 export interface TreeNode {
@@ -56,27 +136,41 @@ export interface TreeNode {
   label: string;
   name?: string | null;
   color?: string | null;
-  /** Shape of the node. Default: `"circle"` */
+  /** Shape of the node. Default: inherited from `default_node_style`, otherwise `"circle"` */
   shape?: NodeShape;
-  /** Render label centered inside the node shape (white text) instead of below it. Default: false */
+  /** Render label centered inside the node shape (white text) instead of below it. Default: inherited, otherwise false */
   label_inside?: boolean;
+  /** Per-node style overrides. */
+  style?: GraphNodeStyle | null;
+  /** Optional built-in icon or registered image rendered inside the node. */
+  media?: NodeMedia | null;
   properties?: Record<string, string>;
 }
 
 export interface TreeEdge {
   source: string;
   target: string;
+  /** Per-edge style overrides. */
+  style?: GraphEdgeStyle | null;
 }
 
 export interface TreePlotSpec {
   width: number;
   height: number;
+  /** Device pixel ratio for HiDPI rendering. Default: 1.0 */
+  pixel_ratio?: number;
   title?: string;
   root_id: string;
   nodes: TreeNode[];
   edges: TreeEdge[];
   /** Default: 18 */
   node_radius?: number;
+  /** Graph-level node style defaults. */
+  default_node_style?: GraphNodeStyle | null;
+  /** Graph-level edge style defaults. */
+  default_edge_style?: GraphEdgeStyle | null;
+  /** Selection ring styling for the currently selected node. */
+  selection_style?: SelectionStyle | null;
   /** Vertical gap between tree levels in pixels. Default: 90 */
   level_gap?: number;
   /** Horizontal gap between siblings in pixels. Default: 96 */
@@ -87,6 +181,8 @@ export interface TreePlotSpec {
   offset_x?: number;
   offset_y?: number;
   selected_node_id?: string | null;
+  /** Node IDs whose descendants should be hidden and removed from layout. */
+  collapsed_node_ids?: string[];
 }
 
 // ─── Line / time-series ───────────────────────────────────────────────────────
@@ -189,10 +285,14 @@ export interface NetworkNode {
   x?: number | null;
   /** Explicit canvas-relative y position (0..height). See `x`. */
   y?: number | null;
-  /** Shape of the node. Default: `"circle"` */
+  /** Shape of the node. Default: inherited from `default_node_style`, otherwise `"circle"` */
   shape?: NodeShape;
-  /** Render label centered inside the node shape (white text) instead of below it. Default: false */
+  /** Render label centered inside the node shape (white text) instead of below it. Default: inherited, otherwise false */
   label_inside?: boolean;
+  /** Per-node style overrides. */
+  style?: GraphNodeStyle | null;
+  /** Optional built-in icon or registered image rendered inside the node. */
+  media?: NodeMedia | null;
   properties?: Record<string, string>;
 }
 
@@ -202,16 +302,26 @@ export interface NetworkEdge {
   label?: string | null;
   color?: string | null;
   weight?: number | null;
+  /** Per-edge style overrides. */
+  style?: GraphEdgeStyle | null;
 }
 
 export interface NetworkPlotSpec {
   width: number;
   height: number;
+  /** Device pixel ratio for HiDPI rendering. Default: 1.0 */
+  pixel_ratio?: number;
   title?: string;
   nodes: NetworkNode[];
   edges: NetworkEdge[];
   /** Default: 16 */
   node_radius?: number;
+  /** Graph-level node style defaults. */
+  default_node_style?: GraphNodeStyle | null;
+  /** Graph-level edge style defaults. */
+  default_edge_style?: GraphEdgeStyle | null;
+  /** Selection ring styling for the currently selected node. */
+  selection_style?: SelectionStyle | null;
   /** Default: 40 */
   margin?: number;
   /** Pan offset in canvas pixels. */
@@ -224,6 +334,22 @@ export interface NetworkPlotSpec {
   show_arrows?: boolean;
   /** Draw node labels. Default: true */
   show_labels?: boolean;
+}
+
+export interface NetworkView {
+  zoom: number;
+  translate_x: number;
+  translate_y: number;
+}
+
+export type NetworkFocusMode = "node_and_neighbors";
+
+export interface NetworkFocusOptions {
+  mode?: NetworkFocusMode | null;
+  /** Screen padding in pixels. Default: 48 */
+  padding?: number | null;
+  /** Minimum world-space span to keep isolated nodes from over-zooming. Default: 160 */
+  min_world_span?: number | null;
 }
 
 // ─── Hit results ──────────────────────────────────────────────────────────────

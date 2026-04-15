@@ -196,6 +196,109 @@ nodes: [
 ]
 ```
 
+#### Graph styling
+
+Tree and network specs both accept graph-level defaults plus per-item style
+overrides:
+
+```js
+const spec = {
+  ...,
+  default_node_style: {
+    fill_color: "#dbeafe",
+    stroke_color: "#1d4ed8",
+    stroke_width: 2,
+    radius: 20,
+    shape: "square",
+  },
+  default_edge_style: {
+    stroke_color: "#64748b",
+    stroke_width: 2,
+    label_visible: true,   // network edge labels only
+  },
+  selection_style: {
+    stroke_color: "#0f172a",
+    stroke_width: 3,
+    padding: 8,
+  },
+  nodes: [
+    { id: "a", label: "A" },   // inherits graph defaults
+    {
+      id: "b",
+      label: "B",
+      color: "#f59e0b",        // legacy per-node fields still work
+      style: { shape: "diamond", radius: 28 },
+    },
+  ],
+  edges: [
+    { source: "a", target: "b", label: "calls", style: { stroke_width: 4 } },
+  ],
+};
+```
+
+Resolution order is:
+
+1. Renderer defaults
+2. Legacy graph-level fields (`node_radius`, `show_labels`, `show_arrows`)
+3. `default_node_style` / `default_edge_style`
+4. Legacy per-item fields (`color`, `shape`, `label_inside`)
+5. Per-item `style`
+
+#### Node media
+
+Tree and network nodes can also render either a built-in icon or a preloaded
+image inside the node body:
+
+```js
+await wasm.register_graph_image(
+  "planetary-nebula",
+  new URL("./demo/assets/planetary-nebula.svg", import.meta.url).href
+);
+
+const spec = {
+  ...,
+  nodes: [
+    {
+      id: "nebula",
+      label: "Nebula",
+      media: {
+        kind: "image",
+        image_key: "planetary-nebula",
+        fit: "cover",
+        scale: 0.82,
+        fallback_icon: "camera",
+      },
+    },
+    {
+      id: "broker",
+      label: "Broker",
+      media: { kind: "icon", icon: "broker", tint_color: "#ffffff" },
+    },
+  ],
+};
+```
+
+Supported built-in icons: `"star"`, `"galaxy"`, `"planet"`, `"moon"`,
+`"telescope"`, `"camera"`, `"alert"`, `"archive"`, `"database"`, `"broker"`,
+`"dish"`, `"spectrograph"`.
+
+Image helpers:
+
+```js
+await wasm.register_graph_image(key, src);
+wasm.has_graph_image(key);        // boolean
+wasm.unregister_graph_image(key); // boolean
+wasm.clear_graph_images();
+```
+
+Notes:
+
+- Images are currently drawn on the wasm canvas backend only.
+- Non-image backends fall back to `fallback_icon` when provided.
+- Missing image keys do not fail the render; they fall back to `fallback_icon`
+  or leave the node body unchanged.
+- When a node has media, its label is rendered below the node instead of inside it.
+
 ---
 
 ## Session lifecycle

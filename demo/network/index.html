@@ -3,43 +3,43 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Stellar Lineage Explorer | Navi WASM</title>
+    <title>Transient Alert Network | Navi WASM</title>
     <meta
       name="description"
-      content="Editorial rooted-tree explorer for astronomy survey pathways, with flexible node and edge styling controls powered by Navi WASM."
+      content="Editorial network explorer for astronomy alert meshes and survey pipelines, with flexible node and edge styling controls powered by Navi WASM."
     />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="../explorer.css" />
-    <link rel="stylesheet" href="./tree.css" />
-    <script type="module" src="./tree.js"></script>
+    <link rel="stylesheet" href="./network.css" />
+    <script type="module" src="./network.js"></script>
   </head>
-  <body class="explorer-body explorer-tree">
+  <body class="explorer-body explorer-network">
     <main class="page explorer-page">
       <header class="explorer-topbar">
         <a href="../" class="back-link">Back to all demos</a>
-        <p class="explorer-label">Navi WASM rooted tree</p>
+        <p class="explorer-label">Navi WASM network graph</p>
       </header>
 
       <section class="explorer-intro">
         <div class="intro-copy">
           <p class="eyebrow">Astronomy explorer</p>
-          <h1>Stellar lineage</h1>
+          <h1>Alert network</h1>
           <p class="lede">
-            Move from cold clouds to stable stars, remnants, and fast transient
-            end states. The tree stays interactive while you swap datasets,
-            tighten edges, and change node treatment from the frontend.
+            Pin ingest streams, let the force layout settle the middle of the
+            graph, and tune node outlines, labels, arrowheads, and edge weight
+            from the frontend.
           </p>
-          <div class="chip-row" id="scenario-buttons" aria-label="Tree scenarios">
-            <button class="chip-button" data-scenario="stellar" type="button">Stellar evolution</button>
-            <button class="chip-button" data-scenario="deepfield" type="button">Deep field taxonomy</button>
-            <button class="chip-button" data-scenario="program" type="button">Survey program</button>
+          <div class="chip-row" id="scenario-buttons" aria-label="Network scenarios">
+            <button class="chip-button" data-scenario="transient" type="button">Transient mesh</button>
+            <button class="chip-button" data-scenario="radio" type="button">Radio calibration</button>
+            <button class="chip-button" data-scenario="exoplanet" type="button">Exoplanet loop</button>
           </div>
         </div>
 
         <figure class="hero-figure">
           <img
-            src="https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1200&q=80"
-            alt="Dense nebula clouds with bright stars across a dark sky."
+            src="https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?auto=format&fit=crop&w=1200&q=80"
+            alt="A bright night sky over an observatory-like landscape."
           />
           <figcaption>Reference image from Unsplash.</figcaption>
         </figure>
@@ -56,48 +56,48 @@
         <section class="explorer-stage">
           <div class="stage-header">
             <div>
-              <p class="stage-kicker" id="tree-kicker">Curated survey branch set</p>
-              <h2 id="tree-title">Stellar evolution pathways</h2>
-              <p class="stage-summary" id="tree-summary">
+              <p class="stage-kicker" id="network-kicker">Curated observatory topology</p>
+              <h2 id="network-title">Transient alert mesh</h2>
+              <p class="stage-summary" id="network-summary">
                 Loading the selected scenario.
               </p>
             </div>
 
             <div class="stage-actions">
               <div class="segmented" id="preset-buttons" aria-label="Appearance presets">
-                <button data-preset="atlas" type="button">Atlas</button>
-                <button data-preset="signal" type="button">Signal</button>
+                <button data-preset="relay" type="button">Relay</button>
+                <button data-preset="pulse" type="button">Pulse</button>
                 <button data-preset="quiet" type="button">Quiet</button>
               </div>
-              <button class="explorer-button" id="tree-reset" type="button">Reset view</button>
+              <button class="explorer-button" id="network-reset" type="button">Reset view</button>
             </div>
           </div>
 
-          <div class="stats-row" id="tree-stats"></div>
+          <div class="stats-row" id="network-stats"></div>
 
           <div class="stage-frame">
-            <canvas id="tree-canvas"></canvas>
+            <canvas id="network-canvas"></canvas>
           </div>
 
           <div class="stage-footer">
             <p class="stage-note">
-              Drag to pan. Use the wheel to zoom. Click a node to inspect its branch,
-              properties, and lineage.
+              Drag to pan. Use the wheel to zoom. Click a node for its inbound and outbound links. Rebuild
+              the layout with new presets or iterations without changing the data API.
             </p>
-            <ul class="legend-list" id="tree-legend"></ul>
+            <ul class="legend-list" id="network-legend"></ul>
           </div>
         </section>
 
         <aside class="explorer-rail">
           <section class="rail-card">
-            <h3>Survey note</h3>
-            <p class="note-copy" id="tree-note"></p>
-            <div class="info-list" id="tree-facts"></div>
+            <h3>Scenario note</h3>
+            <p class="note-copy" id="network-note"></p>
+            <div class="info-list" id="network-facts"></div>
           </section>
 
           <section class="rail-card">
             <h3>Selection</h3>
-            <div id="tree-details"></div>
+            <div id="network-details"></div>
           </section>
 
           <details class="rail-card advanced-card">
@@ -106,9 +106,9 @@
             <label class="field">
               Scenario
               <select id="scenario-select">
-                <option value="stellar">Stellar evolution</option>
-                <option value="deepfield">Deep field taxonomy</option>
-                <option value="program">Survey program</option>
+                <option value="transient">Transient mesh</option>
+                <option value="radio">Radio calibration</option>
+                <option value="exoplanet">Exoplanet loop</option>
               </select>
             </label>
 
@@ -121,26 +121,18 @@
             </label>
 
             <label class="field">
-              Level gap
-              <div class="range-row">
-                <input id="level-gap" type="range" min="74" max="170" step="2" />
-                <span class="range-value" id="level-gap-value"></span>
-              </div>
-            </label>
-
-            <label class="field">
-              Sibling gap
-              <div class="range-row">
-                <input id="sibling-gap" type="range" min="28" max="120" step="2" />
-                <span class="range-value" id="sibling-gap-value"></span>
-              </div>
-            </label>
-
-            <label class="field">
               Edge width
               <div class="range-row">
                 <input id="edge-width" type="range" min="1" max="6" step="1" />
                 <span class="range-value" id="edge-width-value"></span>
+              </div>
+            </label>
+
+            <label class="field">
+              Layout iterations
+              <div class="range-row">
+                <input id="layout-iterations" type="range" min="40" max="240" step="10" />
+                <span class="range-value" id="layout-iterations-value"></span>
               </div>
             </label>
 
@@ -150,6 +142,16 @@
                 <input id="pixel-ratio" type="range" min="1" max="3" step="0.5" />
                 <span class="range-value" id="pixel-ratio-value"></span>
               </div>
+            </label>
+
+            <label class="checkbox-row">
+              <input id="show-labels" type="checkbox" />
+              <span>Show node labels</span>
+            </label>
+
+            <label class="checkbox-row">
+              <input id="show-arrows" type="checkbox" />
+              <span>Show edge arrowheads</span>
             </label>
 
             <label class="checkbox-row">

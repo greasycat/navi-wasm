@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+  <title id="title">Planetary nebula</title>
+  <desc id="desc">Stylized teal and amber planetary nebula with a bright central star.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#fde68a"/>
+      <stop offset="45%" stop-color="#fb923c"/>
+      <stop offset="72%" stop-color="#14b8a6"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </radialGradient>
+    <radialGradient id="halo" cx="48%" cy="48%" r="56%">
+      <stop offset="0%" stop-color="#fff7ed" stop-opacity="0.98"/>
+      <stop offset="35%" stop-color="#fed7aa" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#fdba74" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="160" height="160" rx="24" fill="#020617"/>
+  <circle cx="80" cy="80" r="64" fill="url(#bg)" opacity="0.92"/>
+  <ellipse cx="80" cy="80" rx="54" ry="34" fill="none" stroke="#67e8f9" stroke-width="10" opacity="0.55"/>
+  <ellipse cx="80" cy="80" rx="32" ry="58" fill="none" stroke="#fbbf24" stroke-width="8" opacity="0.38"/>
+  <circle cx="80" cy="80" r="48" fill="url(#halo)"/>
+  <circle cx="80" cy="80" r="10" fill="#ffffff"/>
+  <g fill="#ffffff" opacity="0.85">
+    <circle cx="34" cy="42" r="2.6"/>
+    <circle cx="48" cy="114" r="2.1"/>
+    <circle cx="122" cy="38" r="2.2"/>
+    <circle cx="128" cy="118" r="2.8"/>
+  </g>
+</svg>
