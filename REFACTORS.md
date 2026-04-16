@@ -13,7 +13,6 @@ Excludes generated output and lockfiles:
 - skipped: `target/`, `pkg/`, `node_modules/`, `dist/`, `.git/`
 - skipped: `Cargo.lock`
 
-- `crates/navi_plot_core/src/network/layout.rs`: 1891 lines
 - `demo/main.js`: 1776 lines
 - `demo/tree/tree.js`: 1606 lines
 - `demo/level-ordered-tree/level-ordered-tree.js`: 1597 lines
@@ -25,8 +24,8 @@ Excludes generated output and lockfiles:
 - `crates/navi_plot_wasm/src/lib.rs`: split into `crates/navi_plot_wasm/src/wasm_impl/`
 - `crates/navi_plot_core/src/tree.rs`: split into `crates/navi_plot_core/src/tree/`
 - `crates/navi_plot_core/src/network/tests.rs`: split into `crates/navi_plot_core/src/network/tests/`
+- `crates/navi_plot_core/src/network/layout.rs`: split into `crates/navi_plot_core/src/network/layout/`
 
 ## Next obvious refactor targets
 
-- `crates/navi_plot_core/src/network/layout.rs`
 - `crates/navi_plot_core/src/network/render.rs`
