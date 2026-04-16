@@ -17,7 +17,6 @@ Excludes generated output and lockfiles:
 - `demo/tree/tree.js`: 1606 lines
 - `demo/level-ordered-tree/level-ordered-tree.js`: 1597 lines
 - `demo/network/network.js`: 1305 lines
-- `crates/navi_plot_core/src/network/render.rs`: 1046 lines
 
 ## Recently completed
 
@@ -25,7 +24,11 @@ Excludes generated output and lockfiles:
 - `crates/navi_plot_core/src/tree.rs`: split into `crates/navi_plot_core/src/tree/`
 - `crates/navi_plot_core/src/network/tests.rs`: split into `crates/navi_plot_core/src/network/tests/`
 - `crates/navi_plot_core/src/network/layout.rs`: split into `crates/navi_plot_core/src/network/layout/`
+- `crates/navi_plot_core/src/network/render.rs`: split into `crates/navi_plot_core/src/network/render/`
 
 ## Next obvious refactor targets
 
-- `crates/navi_plot_core/src/network/render.rs`
+- `demo/main.js`
+- `demo/tree/tree.js`
+- `demo/level-ordered-tree/level-ordered-tree.js`
+- `demo/network/network.js`
