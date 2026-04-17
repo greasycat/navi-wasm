@@ -4,7 +4,7 @@ pub(crate) const CHART_MARGIN: u32 = 24;
 pub(crate) const X_LABEL_AREA_SIZE: u32 = 42;
 pub(crate) const Y_LABEL_AREA_SIZE: u32 = 54;
 pub(crate) const CAPTION_AREA_SIZE: u32 = 29;
-const MIN_SCREEN_ZOOM: f64 = 0.25;
+const MIN_SCREEN_ZOOM: f64 = 0.05;
 const MAX_SCREEN_ZOOM: f64 = 8.0;
 const MIN_AXIS_SPAN: f64 = 1e-9;
 
