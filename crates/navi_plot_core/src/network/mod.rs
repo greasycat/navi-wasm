@@ -47,6 +47,7 @@ const STRUCTURAL_EDGE_WEIGHT_THRESHOLD: f64 = 0.5;
 const MIN_LAYOUT_EDGE_WEIGHT: f64 = 0.05;
 const RADIAL_START_ANGLE: f64 = -FRAC_PI_2;
 const RADIAL_RING_SPACING_SCALE: f64 = 1.35;
+const RADIAL_FANOUT_RADIUS_SCALE: f64 = 0.25;
 const RADIAL_RADIUS_SPRING: f64 = 0.24;
 const RADIAL_ANGLE_SPRING: f64 = 0.16;
 const RADIAL_PARENT_SPRING: f64 = 0.05;
@@ -89,6 +90,8 @@ struct HierarchicalLayout {
 #[derive(Debug, Clone, Copy)]
 struct RadialTarget {
     radius: f64,
+    min_radius: f64,
+    max_radius: f64,
     angle: f64,
     min_angle: f64,
     max_angle: f64,

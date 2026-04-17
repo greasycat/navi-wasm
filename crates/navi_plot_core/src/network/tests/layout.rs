@@ -618,3 +618,231 @@ fn network_layout_spreads_nested_siblings_around_parent() {
         .any(|(_, y)| y > chapter.1 + WORLD_NODE_SPACING * 0.2));
     assert_no_layout_collisions(&spec, &layout, 1.0);
 }
+
+#[test]
+fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
+    let spec = NetworkPlotSpec {
+        nodes: vec![
+            NetworkNode {
+                id: "root".to_string(),
+                label: "Root".to_string(),
+                color: None,
+                x: Some(0.0),
+                y: Some(0.0),
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "sparse".to_string(),
+                label: "Sparse chapter".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "dense".to_string(),
+                label: "Dense chapter".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "sparse-leaf".to_string(),
+                label: "Sparse leaf".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "dense-a".to_string(),
+                label: "Dense leaf A".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "dense-b".to_string(),
+                label: "Dense leaf B".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "dense-c".to_string(),
+                label: "Dense leaf C".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "dense-d".to_string(),
+                label: "Dense leaf D".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                properties: Default::default(),
+            },
+        ],
+        edges: vec![
+            NetworkEdge {
+                source: "root".to_string(),
+                target: "sparse".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "root".to_string(),
+                target: "dense".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "sparse".to_string(),
+                target: "sparse-leaf".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense".to_string(),
+                target: "dense-a".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense".to_string(),
+                target: "dense-b".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense".to_string(),
+                target: "dense-c".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense".to_string(),
+                target: "dense-d".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "sparse".to_string(),
+                target: "dense".to_string(),
+                label: None,
+                color: None,
+                weight: Some(0.15),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense-a".to_string(),
+                target: "dense-b".to_string(),
+                label: None,
+                color: None,
+                weight: Some(0.15),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense-b".to_string(),
+                target: "dense-c".to_string(),
+                label: None,
+                color: None,
+                weight: Some(0.15),
+                style: None,
+            },
+            NetworkEdge {
+                source: "dense-c".to_string(),
+                target: "dense-d".to_string(),
+                label: None,
+                color: None,
+                weight: Some(0.15),
+                style: None,
+            },
+        ],
+        layout_iterations: 220,
+        node_radius: 24,
+        ..sample_spec()
+    };
+
+    let layout = compute_layout(&spec).unwrap();
+    let root = layout["root"];
+    let sparse = layout["sparse"];
+    let sparse_leaf = layout["sparse-leaf"];
+    let dense = layout["dense"];
+    let dense_children = [
+        layout["dense-a"],
+        layout["dense-b"],
+        layout["dense-c"],
+        layout["dense-d"],
+    ];
+
+    let sparse_parent_distance =
+        ((sparse_leaf.0 - sparse.0).powi(2) + (sparse_leaf.1 - sparse.1).powi(2)).sqrt();
+    let dense_parent_distance = dense_children
+        .iter()
+        .map(|&(x, y)| ((x - dense.0).powi(2) + (y - dense.1).powi(2)).sqrt())
+        .sum::<f64>()
+        / dense_children.len() as f64;
+    let sparse_root_distance =
+        ((sparse_leaf.0 - root.0).powi(2) + (sparse_leaf.1 - root.1).powi(2)).sqrt();
+    let dense_root_distance = dense_children
+        .iter()
+        .map(|&(x, y)| ((x - root.0).powi(2) + (y - root.1).powi(2)).sqrt())
+        .sum::<f64>()
+        / dense_children.len() as f64;
+
+    assert!(dense_parent_distance > sparse_parent_distance + WORLD_NODE_SPACING * 0.15);
+    assert!(dense_root_distance > sparse_root_distance + WORLD_NODE_SPACING * 0.15);
+    assert_no_layout_collisions(&spec, &layout, 1.0);
+}

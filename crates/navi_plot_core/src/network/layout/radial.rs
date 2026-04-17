@@ -235,6 +235,11 @@ pub(in crate::network) fn radial_ring_spacing(
         * RADIAL_RING_SPACING_SCALE
 }
 
+pub(in crate::network) fn fanout_radius_step(base_spacing: f64, child_count: usize) -> f64 {
+    let fanout_extra = child_count.saturating_sub(1) as f64;
+    base_spacing * (1.0 + fanout_extra * RADIAL_FANOUT_RADIUS_SCALE)
+}
+
 pub(in crate::network) fn child_intervals(
     start: f64,
     end: f64,
@@ -390,15 +395,13 @@ pub(in crate::network) fn radial_targets(
     hierarchy: &HierarchicalLayout,
     view_zoom: f64,
     previous_root_anchors: Option<&HashMap<String, f64>>,
-) -> (Vec<RadialTarget>, Vec<f64>) {
-    let max_depth = hierarchy.depth_by_idx.iter().copied().max().unwrap_or(0);
-    let ring_spacing = radial_ring_spacing(spec, resolved, view_zoom);
-    let ring_radii: Vec<f64> = (0..=max_depth)
-        .map(|depth| depth as f64 * ring_spacing)
-        .collect();
+) -> (Vec<RadialTarget>, f64) {
+    let base_spacing = radial_ring_spacing(spec, resolved, view_zoom);
     let mut targets = vec![
         RadialTarget {
             radius: 0.0,
+            min_radius: 0.0,
+            max_radius: 0.0,
             angle: RADIAL_START_ANGLE,
             min_angle: RADIAL_START_ANGLE,
             max_angle: RADIAL_START_ANGLE + TAU,
@@ -409,7 +412,7 @@ pub(in crate::network) fn radial_targets(
     fn assign_targets(
         spec: &NetworkPlotSpec,
         hierarchy: &HierarchicalLayout,
-        ring_radii: &[f64],
+        base_spacing: f64,
         previous_root_anchors: Option<&HashMap<String, f64>>,
         node_idx: usize,
         start_angle: f64,
@@ -425,7 +428,6 @@ pub(in crate::network) fn radial_targets(
             .iter()
             .map(|&child_idx| hierarchy.subtree_size_by_idx[child_idx] as f64)
             .collect();
-        let depth = hierarchy.depth_by_idx[children[0]];
         let canonical = child_intervals(start_angle, end_angle, &weights, None);
         let anchored = if node_idx == hierarchy.root_idx {
             let desired_centers: Vec<f64> = children
@@ -441,13 +443,22 @@ pub(in crate::network) fn radial_targets(
         } else {
             canonical
         };
+        let child_step = fanout_radius_step(base_spacing, children.len());
+        let child_radius = targets[node_idx].radius + child_step;
 
         for (child_pos, &child_idx) in children.iter().enumerate() {
             let (slot_start, slot_end) = anchored[child_pos];
             let min_angle = slot_start.min(slot_end);
             let max_angle = slot_start.max(slot_end);
+            let child_outward_step = if hierarchy.children_by_idx[child_idx].is_empty() {
+                child_step
+            } else {
+                fanout_radius_step(base_spacing, hierarchy.children_by_idx[child_idx].len())
+            };
             targets[child_idx] = RadialTarget {
-                radius: ring_radii[depth],
+                radius: child_radius,
+                min_radius: (targets[node_idx].radius + child_radius) * 0.5,
+                max_radius: child_radius + child_outward_step * 0.5,
                 angle: (min_angle + max_angle) * 0.5,
                 min_angle,
                 max_angle,
@@ -455,7 +466,7 @@ pub(in crate::network) fn radial_targets(
             assign_targets(
                 spec,
                 hierarchy,
-                ring_radii,
+                base_spacing,
                 previous_root_anchors,
                 child_idx,
                 slot_start,
@@ -468,51 +479,42 @@ pub(in crate::network) fn radial_targets(
     assign_targets(
         spec,
         hierarchy,
-        &ring_radii,
+        base_spacing,
         previous_root_anchors,
         hierarchy.root_idx,
         RADIAL_START_ANGLE,
         RADIAL_START_ANGLE + TAU,
         &mut targets,
     );
+    if !hierarchy.children_by_idx[hierarchy.root_idx].is_empty() {
+        let root_outward_step = fanout_radius_step(
+            base_spacing,
+            hierarchy.children_by_idx[hierarchy.root_idx].len(),
+        );
+        targets[hierarchy.root_idx].max_radius = root_outward_step * 0.5;
+    }
 
-    (targets, ring_radii)
+    (targets, base_spacing)
 }
 
 pub(in crate::network) fn constrain_radial_positions(
     hierarchy: &HierarchicalLayout,
     targets: &[RadialTarget],
-    ring_radii: &[f64],
     origin: (f64, f64),
     positions: &mut [(f64, f64)],
 ) {
-    let ring_spacing = if ring_radii.len() > 1 {
-        ring_radii[1] - ring_radii[0]
-    } else {
-        WORLD_NODE_SPACING
-    };
     positions[hierarchy.root_idx] = origin;
     for idx in 0..positions.len() {
         if idx == hierarchy.root_idx {
             continue;
         }
         let target = targets[idx];
-        let depth = hierarchy.depth_by_idx[idx];
         let (current_radius, current_angle) =
             polar_from_position_unwrapped(origin, positions[idx], target.angle);
-        let min_radius = if depth == 0 {
-            0.0
-        } else {
-            (ring_radii[depth - 1] + ring_radii[depth]) * 0.5
-        };
-        let max_radius = if depth + 1 < ring_radii.len() {
-            (ring_radii[depth] + ring_radii[depth + 1]) * 0.5
-        } else {
-            ring_radii[depth] + ring_spacing * 0.5
-        };
         let min_angle = target.min_angle.min(target.max_angle);
         let max_angle = target.max_angle.max(target.min_angle);
-        let clamped_radius = current_radius.clamp(min_radius, max_radius.max(min_radius));
+        let clamped_radius =
+            current_radius.clamp(target.min_radius, target.max_radius.max(target.min_radius));
         let clamped_angle = current_angle.clamp(min_angle, max_angle);
         positions[idx] = polar_to_cartesian(origin, clamped_radius, clamped_angle);
     }
@@ -521,7 +523,7 @@ pub(in crate::network) fn constrain_radial_positions(
 pub(in crate::network) fn relax_radial_positions(
     hierarchy: &HierarchicalLayout,
     targets: &[RadialTarget],
-    ring_radii: &[f64],
+    base_spacing: f64,
     origin: (f64, f64),
     positions: &mut [(f64, f64)],
     iterations: usize,
@@ -529,12 +531,7 @@ pub(in crate::network) fn relax_radial_positions(
     if positions.is_empty() {
         return;
     }
-    let ring_spacing = if ring_radii.len() > 1 {
-        ring_radii[1] - ring_radii[0]
-    } else {
-        WORLD_NODE_SPACING
-    };
-    let mut temperature = (ring_spacing * 0.18).max(8.0);
+    let mut temperature = (base_spacing * 0.18).max(8.0);
     let max_iterations = iterations.max(1).min(LOCAL_RELAXATION_MAX_ITERATIONS);
 
     for _ in 0..max_iterations {
@@ -557,7 +554,7 @@ pub(in crate::network) fn relax_radial_positions(
                 let dx = positions[source_idx].0 - positions[target_idx].0;
                 let dy = positions[source_idx].1 - positions[target_idx].1;
                 let dist = (dx * dx + dy * dy).sqrt().max(0.01);
-                let force = (RADIAL_REPULSION_FORCE * ring_spacing * ring_spacing / dist)
+                let force = (RADIAL_REPULSION_FORCE * base_spacing * base_spacing / dist)
                     / (depth_gap as f64 + 1.0);
                 let fx = dx / dist * force;
                 let fy = dy / dist * force;
@@ -591,11 +588,11 @@ pub(in crate::network) fn relax_radial_positions(
             displacement[idx].1 += radial_dir.1 * radius_error * RADIAL_RADIUS_SPRING;
             displacement[idx].0 += tangent_dir.0
                 * angle_error
-                * target.radius.max(ring_spacing * 0.6)
+                * target.radius.max(base_spacing * 0.6)
                 * RADIAL_ANGLE_SPRING;
             displacement[idx].1 += tangent_dir.1
                 * angle_error
-                * target.radius.max(ring_spacing * 0.6)
+                * target.radius.max(base_spacing * 0.6)
                 * RADIAL_ANGLE_SPRING;
 
             if let Some(parent_idx) = hierarchy.parent_by_idx[idx] {
@@ -604,7 +601,7 @@ pub(in crate::network) fn relax_radial_positions(
                 let dist = (dx * dx + dy * dy).sqrt().max(0.01);
                 let desired = (targets[idx].radius - targets[parent_idx].radius)
                     .abs()
-                    .max(ring_spacing * 0.72);
+                    .max(base_spacing * 0.72);
                 let stretch = dist - desired;
                 let fx = dx / dist * stretch * RADIAL_PARENT_SPRING;
                 let fy = dy / dist * stretch * RADIAL_PARENT_SPRING;
@@ -630,7 +627,7 @@ pub(in crate::network) fn relax_radial_positions(
             positions[idx].0 += displacement[idx].0 * scale;
             positions[idx].1 += displacement[idx].1 * scale;
         }
-        constrain_radial_positions(hierarchy, targets, ring_radii, origin, positions);
+        constrain_radial_positions(hierarchy, targets, origin, positions);
         temperature *= 0.9;
     }
 }
@@ -656,7 +653,7 @@ pub(in crate::network) fn compute_radial_layout_with_zoom(
                 previous_layout,
             )
         });
-    let (targets, ring_radii) = radial_targets(
+    let (targets, base_spacing) = radial_targets(
         spec,
         resolved,
         hierarchy,
@@ -680,11 +677,11 @@ pub(in crate::network) fn compute_radial_layout_with_zoom(
             }
         })
         .collect();
-    constrain_radial_positions(hierarchy, &targets, &ring_radii, origin, &mut positions);
+    constrain_radial_positions(hierarchy, &targets, origin, &mut positions);
     relax_radial_positions(
         hierarchy,
         &targets,
-        &ring_radii,
+        base_spacing,
         origin,
         &mut positions,
         spec.layout_iterations as usize,
