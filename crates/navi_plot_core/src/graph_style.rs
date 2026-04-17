@@ -4,6 +4,15 @@ use crate::PlotError;
 use plotters::style::{RGBColor, BLACK};
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct ResolvedShadow {
+    pub color: RGBColor,
+    pub blur: i32,
+    pub offset_x: i32,
+    pub offset_y: i32,
+    pub opacity: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct ResolvedNodeStyle {
     pub fill_color: RGBColor,
     pub stroke_color: Option<RGBColor>,
@@ -14,6 +23,7 @@ pub(crate) struct ResolvedNodeStyle {
     pub label_visible: bool,
     pub label_color: Option<RGBColor>,
     pub label_inside: bool,
+    pub shadow: Option<ResolvedShadow>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -68,6 +78,7 @@ pub(crate) fn resolve_node_style(
     let mut label_visible = ctx.default_label_visible;
     let mut label_color = None;
     let mut label_inside = false;
+    let mut shadow = None;
 
     apply_node_style(
         ctx.graph_style,
@@ -80,6 +91,7 @@ pub(crate) fn resolve_node_style(
         &mut label_visible,
         &mut label_color,
         &mut label_inside,
+        &mut shadow,
     )?;
 
     if let Some(value) = ctx.legacy_fill_color {
@@ -103,6 +115,7 @@ pub(crate) fn resolve_node_style(
         &mut label_visible,
         &mut label_color,
         &mut label_inside,
+        &mut shadow,
     )?;
 
     Ok(ResolvedNodeStyle {
@@ -115,6 +128,7 @@ pub(crate) fn resolve_node_style(
         label_visible,
         label_color,
         label_inside,
+        shadow,
     })
 }
 
@@ -209,6 +223,7 @@ fn apply_node_style(
     label_visible: &mut bool,
     label_color: &mut Option<RGBColor>,
     label_inside: &mut bool,
+    shadow: &mut Option<ResolvedShadow>,
 ) -> Result<(), PlotError> {
     let Some(style) = style else {
         return Ok(());
@@ -240,6 +255,20 @@ fn apply_node_style(
     }
     if let Some(value) = style.label_inside {
         *label_inside = value;
+    }
+    if let Some(color_str) = style.shadow_color.as_deref() {
+        let color = parse_color(color_str)?;
+        let blur = style.shadow_blur.unwrap_or(6.0);
+        let offset_x = style.shadow_offset_x.unwrap_or(2.0);
+        let offset_y = style.shadow_offset_y.unwrap_or(3.0);
+        let opacity = style.shadow_opacity.unwrap_or(0.28);
+        *shadow = Some(ResolvedShadow {
+            color,
+            blur: blur.round().max(0.0) as i32,
+            offset_x: offset_x.round() as i32,
+            offset_y: offset_y.round() as i32,
+            opacity: opacity.clamp(0.0, 1.0),
+        });
     }
 
     Ok(())

@@ -775,6 +775,7 @@ dependencies = [
  "js-sys",
  "navi_plot_core",
  "plotters",
+ "plotters-backend",
  "plotters-canvas",
  "serde",
  "serde-wasm-bindgen",

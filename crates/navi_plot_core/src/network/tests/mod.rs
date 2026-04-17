@@ -19,6 +19,7 @@ fn sample_spec() -> NetworkPlotSpec {
         width: 480,
         height: 360,
         title: "Test Network".to_string(),
+        font_family: None,
         nodes: vec![
             NetworkNode {
                 id: "a".to_string(),

@@ -157,6 +157,11 @@ pub(in crate::network) fn scale_node_style(
     let mut scaled = style.clone();
     scaled.radius = ((scaled.radius.max(1) as f64) * zoom).round() as i32;
     scaled.radius = scaled.radius.max(1);
+    if let Some(ref mut shadow) = scaled.shadow {
+        shadow.blur = ((shadow.blur as f64) * zoom).round() as i32;
+        shadow.offset_x = ((shadow.offset_x as f64) * zoom).round() as i32;
+        shadow.offset_y = ((shadow.offset_y as f64) * zoom).round() as i32;
+    }
     scaled
 }
 

@@ -108,6 +108,7 @@ pub use types::{
 
 use plotters::coord::Shift;
 use plotters::prelude::DrawingArea;
+use plotters::style::FontFamily;
 
 pub(crate) fn ensure_dimensions(width: u32, height: u32) -> Result<(), PlotError> {
     if width == 0 || height == 0 {
@@ -124,6 +125,14 @@ where
     PlotError::Backend {
         message: format!("{error:?}"),
     }
+}
+
+pub(crate) fn font_family<'a>(value: Option<&'a str>) -> FontFamily<'a> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(FontFamily::from)
+        .unwrap_or(FontFamily::Monospace)
 }
 
 pub type PlotArea<DB> = DrawingArea<DB, Shift>;

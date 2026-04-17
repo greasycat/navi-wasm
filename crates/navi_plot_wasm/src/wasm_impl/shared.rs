@@ -1,4 +1,8 @@
 use super::*;
+use crate::hidpi::{resolve_canvas_hidpi_plan, CanvasHiDpiMode};
+use plotters_backend::{
+    BackendColor, BackendCoord, BackendStyle, BackendTextStyle, DrawingBackend, DrawingErrorKind,
+};
 
 #[derive(Serialize)]
 pub(crate) struct ScatterHit {
@@ -37,6 +41,106 @@ pub(crate) struct NetworkHit {
 pub(crate) struct NetworkBadgeHit {
     pub(crate) kind: String,
     pub(crate) node_id: String,
+}
+
+pub(crate) struct HiDpiCanvasBackend {
+    inner: CanvasBackend,
+    logical_size: (u32, u32),
+}
+
+impl DrawingBackend for HiDpiCanvasBackend {
+    type ErrorType = <CanvasBackend as DrawingBackend>::ErrorType;
+
+    fn get_size(&self) -> (u32, u32) {
+        self.logical_size
+    }
+
+    fn ensure_prepared(&mut self) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.ensure_prepared()
+    }
+
+    fn present(&mut self) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.present()
+    }
+
+    fn draw_pixel(
+        &mut self,
+        point: BackendCoord,
+        color: BackendColor,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_pixel(point, color)
+    }
+
+    fn draw_line<S: BackendStyle>(
+        &mut self,
+        from: BackendCoord,
+        to: BackendCoord,
+        style: &S,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_line(from, to, style)
+    }
+
+    fn draw_rect<S: BackendStyle>(
+        &mut self,
+        upper_left: BackendCoord,
+        bottom_right: BackendCoord,
+        style: &S,
+        fill: bool,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_rect(upper_left, bottom_right, style, fill)
+    }
+
+    fn draw_path<S: BackendStyle, I: IntoIterator<Item = BackendCoord>>(
+        &mut self,
+        path: I,
+        style: &S,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_path(path, style)
+    }
+
+    fn draw_circle<S: BackendStyle>(
+        &mut self,
+        center: BackendCoord,
+        radius: u32,
+        style: &S,
+        fill: bool,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_circle(center, radius, style, fill)
+    }
+
+    fn fill_polygon<S: BackendStyle, I: IntoIterator<Item = BackendCoord>>(
+        &mut self,
+        vert: I,
+        style: &S,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.fill_polygon(vert, style)
+    }
+
+    fn draw_text<TStyle: BackendTextStyle>(
+        &mut self,
+        text: &str,
+        style: &TStyle,
+        pos: BackendCoord,
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.draw_text(text, style, pos)
+    }
+
+    fn estimate_text_size<TStyle: BackendTextStyle>(
+        &self,
+        text: &str,
+        style: &TStyle,
+    ) -> Result<(u32, u32), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.estimate_text_size(text, style)
+    }
+
+    fn blit_bitmap(
+        &mut self,
+        pos: BackendCoord,
+        size: (u32, u32),
+        src: &[u8],
+    ) -> Result<(), DrawingErrorKind<Self::ErrorType>> {
+        self.inner.blit_bitmap(pos, size, src)
+    }
 }
 
 pub(crate) struct ScatterCanvasSession {
@@ -245,6 +349,65 @@ pub(crate) fn unknown_heatmap_session(handle: u32) -> JsValue {
     JsValue::from_str(&format!("unknown heatmap session handle {handle}"))
 }
 
+fn current_device_pixel_ratio() -> f64 {
+    window()
+        .map(|window| window.device_pixel_ratio())
+        .filter(|value| value.is_finite() && *value > 1.0)
+        .map(|value| value.min(8.0))
+        .unwrap_or(1.0)
+}
+
+fn canvas_client_size(canvas: &HtmlCanvasElement) -> Result<(u32, u32), JsValue> {
+    let element: web_sys::Element = canvas
+        .clone()
+        .dyn_into()
+        .map_err(|_| js_error("canvas element could not be cast to Element"))?;
+    let rect = element.get_bounding_client_rect();
+    Ok((
+        rect.width().round().max(0.0) as u32,
+        rect.height().round().max(0.0) as u32,
+    ))
+}
+
+fn canvas_hidpi_plan(
+    canvas: &HtmlCanvasElement,
+    width: u32,
+    height: u32,
+) -> Result<crate::hidpi::CanvasHiDpiPlan, JsValue> {
+    let (client_width, client_height) = canvas_client_size(canvas)?;
+    Ok(resolve_canvas_hidpi_plan(
+        width,
+        height,
+        client_width,
+        client_height,
+        current_device_pixel_ratio(),
+    ))
+}
+
+pub(crate) fn normalize_tree_spec_for_canvas(
+    canvas_id: &str,
+    mut spec: TreePlotSpec,
+) -> Result<TreePlotSpec, JsValue> {
+    let canvas = canvas_by_id(canvas_id)?;
+    let plan = canvas_hidpi_plan(&canvas, spec.width, spec.height)?;
+    if matches!(plan.mode, CanvasHiDpiMode::Logical) {
+        spec.pixel_ratio = 1.0;
+    }
+    Ok(spec)
+}
+
+pub(crate) fn normalize_network_spec_for_canvas(
+    canvas_id: &str,
+    mut spec: NetworkPlotSpec,
+) -> Result<NetworkPlotSpec, JsValue> {
+    let canvas = canvas_by_id(canvas_id)?;
+    let plan = canvas_hidpi_plan(&canvas, spec.width, spec.height)?;
+    if matches!(plan.mode, CanvasHiDpiMode::Logical) {
+        spec.pixel_ratio = 1.0;
+    }
+    Ok(spec)
+}
+
 pub(crate) fn to_js_value<T>(value: &T) -> Result<JsValue, JsValue>
 where
     T: Serialize,
@@ -279,31 +442,72 @@ pub(crate) fn canvas_by_id(canvas_id: &str) -> Result<HtmlCanvasElement, JsValue
         .map_err(|_| JsValue::from_str(&format!("element '{canvas_id}' is not an HTML canvas")))
 }
 
-pub(crate) fn drawing_area(
-    canvas_id: &str,
-    width: u32,
-    height: u32,
-) -> Result<plotters::drawing::DrawingArea<CanvasBackend, Shift>, JsValue> {
-    let canvas = canvas_by_id(canvas_id)?;
-    if canvas.width() != width {
-        canvas.set_width(width);
-    }
-    if canvas.height() != height {
-        canvas.set_height(height);
-    }
-    let backend = CanvasBackend::with_canvas_object(canvas)
-        .ok_or_else(|| JsValue::from_str("failed to create CanvasBackend from canvas element"))?;
-    Ok(backend.into_drawing_area())
-}
-
-pub(crate) fn canvas_2d_context(canvas_id: &str) -> Result<CanvasRenderingContext2d, JsValue> {
-    let canvas = canvas_by_id(canvas_id)?;
+fn canvas_2d_context_for_canvas(
+    canvas: &HtmlCanvasElement,
+) -> Result<CanvasRenderingContext2d, JsValue> {
     let context = canvas
         .get_context("2d")?
         .ok_or_else(|| js_error("2d canvas context is not available"))?;
     context
         .dyn_into::<CanvasRenderingContext2d>()
         .map_err(|_| js_error("failed to cast 2d canvas context"))
+}
+
+pub(crate) fn drawing_area(
+    canvas_id: &str,
+    width: u32,
+    height: u32,
+) -> Result<plotters::drawing::DrawingArea<HiDpiCanvasBackend, Shift>, JsValue> {
+    let canvas = canvas_by_id(canvas_id)?;
+    let plan = canvas_hidpi_plan(&canvas, width, height)?;
+    if canvas.width() != plan.backing_width {
+        canvas.set_width(plan.backing_width);
+    }
+    if canvas.height() != plan.backing_height {
+        canvas.set_height(plan.backing_height);
+    }
+    let html_element: web_sys::HtmlElement = canvas
+        .clone()
+        .dyn_into()
+        .map_err(|_| js_error("canvas element could not be cast to HtmlElement"))?;
+    let style = html_element.style();
+    if plan.set_logical_style_size {
+        style.set_property("width", &format!("{}px", plan.logical_width))?;
+        style.set_property("height", &format!("{}px", plan.logical_height))?;
+    } else {
+        let _ = style.remove_property("width");
+        let _ = style.remove_property("height");
+    }
+    let context = canvas_2d_context_for_canvas(&canvas)?;
+    context.set_transform(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)?;
+    context.clear_rect(
+        0.0,
+        0.0,
+        f64::from(plan.backing_width),
+        f64::from(plan.backing_height),
+    );
+    if matches!(plan.mode, CanvasHiDpiMode::Logical) {
+        context.set_transform(
+            plan.transform_scale,
+            0.0,
+            0.0,
+            plan.transform_scale,
+            0.0,
+            0.0,
+        )?;
+    }
+    let backend = CanvasBackend::with_canvas_object(canvas)
+        .ok_or_else(|| JsValue::from_str("failed to create CanvasBackend from canvas element"))?;
+    Ok(HiDpiCanvasBackend {
+        inner: backend,
+        logical_size: (plan.logical_width, plan.logical_height),
+    }
+    .into_drawing_area())
+}
+
+pub(crate) fn canvas_2d_context(canvas_id: &str) -> Result<CanvasRenderingContext2d, JsValue> {
+    let canvas = canvas_by_id(canvas_id)?;
+    canvas_2d_context_for_canvas(&canvas)
 }
 
 pub(crate) async fn register_graph_image(key: String, src: String) -> Result<(), JsValue> {
@@ -599,6 +803,7 @@ pub(crate) fn render_scatter(canvas_id: &str, spec: JsValue) -> Result<(), JsVal
 
 pub(crate) fn render_tree(canvas_id: &str, spec: JsValue) -> Result<(), JsValue> {
     let spec: TreePlotSpec = from_value(spec).map_err(js_error)?;
+    let spec = normalize_tree_spec_for_canvas(canvas_id, spec)?;
     let root = drawing_area(canvas_id, spec.width, spec.height)?;
     render_tree_on(root, &spec).map_err(plot_error_to_js)?;
     let nodes = tree_render_nodes(&spec).map_err(plot_error_to_js)?;
@@ -607,6 +812,7 @@ pub(crate) fn render_tree(canvas_id: &str, spec: JsValue) -> Result<(), JsValue>
 
 pub(crate) fn create_tree_session(canvas_id: &str, spec: JsValue) -> Result<u32, JsValue> {
     let spec: TreePlotSpec = from_value(spec).map_err(js_error)?;
+    let spec = normalize_tree_spec_for_canvas(canvas_id, spec)?;
     let session = TreeSession::new(spec).map_err(plot_error_to_js)?;
     let _ = canvas_by_id(canvas_id)?;
     TREE_SESSIONS.with(|store| Ok(store.borrow_mut().insert(canvas_id.to_string(), session)))

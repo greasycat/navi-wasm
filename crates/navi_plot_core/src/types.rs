@@ -14,6 +14,10 @@ pub struct ScatterPlotSpec {
     /// Optional chart title drawn at the top.
     #[serde(default)]
     pub title: String,
+    /// Font family used for chart text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     #[serde(default)]
     pub x_label: String,
     #[serde(default)]
@@ -58,6 +62,10 @@ pub struct TreePlotSpec {
     pub height: u32,
     #[serde(default)]
     pub title: String,
+    /// Font family used for graph text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     pub root_id: String,
     pub nodes: Vec<TreeNode>,
     pub edges: Vec<TreeEdge>,
@@ -89,9 +97,9 @@ pub struct TreePlotSpec {
     /// Node IDs whose descendants should be hidden and removed from layout.
     #[serde(default)]
     pub collapsed_node_ids: Vec<String>,
-    /// Device pixel ratio used to scale fonts for HiDPI canvases. Default: 1.0.
-    /// Set to `window.devicePixelRatio` in JS and multiply `width`, `height`,
-    /// `margin`, `node_radius`, `level_gap`, and `sibling_gap` by the same factor.
+    /// HiDPI canvas hint. Default: 1.0.
+    /// JS callers may either provide logical CSS `width`/`height` with this ratio,
+    /// or pre-scale all canvas-space values manually for legacy callers.
     #[serde(default = "default_pixel_ratio")]
     pub pixel_ratio: f64,
 }
@@ -202,6 +210,21 @@ pub struct GraphNodeStyle {
     /// Render the label centered inside the node shape instead of below it.
     #[serde(default)]
     pub label_inside: Option<bool>,
+    /// Drop-shadow color. CSS hex (e.g. `"#000000"`). No shadow when omitted.
+    #[serde(default)]
+    pub shadow_color: Option<String>,
+    /// Shadow blur radius in pixels (`0` = hard shadow). Default: `6`.
+    #[serde(default)]
+    pub shadow_blur: Option<f64>,
+    /// Shadow horizontal offset in pixels. Default: `2`.
+    #[serde(default)]
+    pub shadow_offset_x: Option<f64>,
+    /// Shadow vertical offset in pixels. Default: `3`.
+    #[serde(default)]
+    pub shadow_offset_y: Option<f64>,
+    /// Shadow opacity `0..=1`. Default: `0.28`.
+    #[serde(default)]
+    pub shadow_opacity: Option<f64>,
 }
 
 /// Shared style overrides for tree and network graph edges.
@@ -309,6 +332,10 @@ pub struct LinePlotSpec {
     pub height: u32,
     #[serde(default)]
     pub title: String,
+    /// Font family used for chart text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     #[serde(default)]
     pub x_label: String,
     #[serde(default)]
@@ -376,6 +403,10 @@ pub struct BarChartSpec {
     pub height: u32,
     #[serde(default)]
     pub title: String,
+    /// Font family used for chart text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     #[serde(default)]
     pub x_label: String,
     #[serde(default)]
@@ -433,6 +464,10 @@ pub struct HeatmapSpec {
     pub height: u32,
     #[serde(default)]
     pub title: String,
+    /// Font family used for chart text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     /// One label per row. Length must equal `cells.len()` when non-empty.
     #[serde(default)]
     pub row_labels: Vec<String>,
@@ -482,6 +517,10 @@ pub struct NetworkPlotSpec {
     pub height: u32,
     #[serde(default)]
     pub title: String,
+    /// Font family used for graph text. Example: `"Roboto, sans-serif"`.
+    /// Default: `"sans-serif"`.
+    #[serde(default)]
+    pub font_family: Option<String>,
     pub nodes: Vec<NetworkNode>,
     pub edges: Vec<NetworkEdge>,
     /// Node circle radius in pixels. Default: 16.
@@ -518,7 +557,9 @@ pub struct NetworkPlotSpec {
     /// Draw node labels. Default: `true`.
     #[serde(default = "default_true")]
     pub show_labels: bool,
-    /// Device pixel ratio used to scale fonts for HiDPI canvases. Default: 1.0.
+    /// HiDPI canvas hint. Default: 1.0.
+    /// JS callers may either provide logical CSS `width`/`height` with this ratio,
+    /// or pre-scale all canvas-space values manually for legacy callers.
     #[serde(default = "default_pixel_ratio")]
     pub pixel_ratio: f64,
 }

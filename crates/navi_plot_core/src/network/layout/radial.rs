@@ -425,6 +425,7 @@ pub(in crate::network) fn radial_targets(
             .iter()
             .map(|&child_idx| hierarchy.subtree_size_by_idx[child_idx] as f64)
             .collect();
+        let depth = hierarchy.depth_by_idx[children[0]];
         let canonical = child_intervals(start_angle, end_angle, &weights, None);
         let anchored = if node_idx == hierarchy.root_idx {
             let desired_centers: Vec<f64> = children
@@ -443,7 +444,6 @@ pub(in crate::network) fn radial_targets(
 
         for (child_pos, &child_idx) in children.iter().enumerate() {
             let (slot_start, slot_end) = anchored[child_pos];
-            let depth = hierarchy.depth_by_idx[child_idx];
             let min_angle = slot_start.min(slot_end);
             let max_angle = slot_start.max(slot_end);
             targets[child_idx] = RadialTarget {

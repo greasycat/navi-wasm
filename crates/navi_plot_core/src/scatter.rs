@@ -3,7 +3,7 @@ use crate::viewport::{
     ensure_finite, resolve_axis_range, CartesianViewport, PixelBounds, CHART_MARGIN,
     X_LABEL_AREA_SIZE, Y_LABEL_AREA_SIZE,
 };
-use crate::{backend_error, ensure_dimensions, PlotArea, PlotError, ScatterPlotSpec};
+use crate::{backend_error, ensure_dimensions, font_family, PlotArea, PlotError, ScatterPlotSpec};
 use plotters::coord::cartesian::Cartesian2d;
 use plotters::coord::types::RangedCoordf64;
 use plotters::prelude::*;
@@ -85,6 +85,8 @@ impl ScatterSession {
             .configure_mesh()
             .x_desc(x_axis_label(&self.spec))
             .y_desc(y_axis_label(&self.spec))
+            .label_style((font_family(self.spec.font_family.as_deref()), 12))
+            .axis_desc_style((font_family(self.spec.font_family.as_deref()), 14))
             .bold_line_style(RGBColor(209, 213, 219))
             .light_line_style(RGBColor(229, 231, 235))
             .axis_style(BLACK.mix(0.85))
@@ -112,7 +114,7 @@ impl ScatterSession {
                             + Text::new(
                                 point.label.clone(),
                                 (point.radius + 4, -point.radius - 4),
-                                ("sans-serif", 12).into_font(),
+                                (font_family(self.spec.font_family.as_deref()), 12).into_font(),
                             )
                     }),
             )
@@ -136,7 +138,9 @@ impl ScatterSession {
                             + Text::new(
                                 point.name.clone(),
                                 (point.radius + 10, point.radius + 16),
-                                ("sans-serif", 13).into_font().color(&BLACK),
+                                (font_family(self.spec.font_family.as_deref()), 13)
+                                    .into_font()
+                                    .color(&BLACK),
                             ),
                     ))
                     .map_err(backend_error)?;
@@ -337,7 +341,10 @@ where
 {
     ChartBuilder::on(root)
         .margin(CHART_MARGIN)
-        .caption(chart_title(spec), ("sans-serif", 24))
+        .caption(
+            chart_title(spec),
+            (font_family(spec.font_family.as_deref()), 24),
+        )
         .x_label_area_size(X_LABEL_AREA_SIZE)
         .y_label_area_size(Y_LABEL_AREA_SIZE)
         .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)
@@ -379,6 +386,7 @@ mod tests {
             width: 480,
             height: 320,
             title: "Scatter".to_string(),
+            font_family: None,
             x_label: "x".to_string(),
             y_label: "y".to_string(),
             x_range: None,

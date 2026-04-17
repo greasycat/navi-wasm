@@ -1,6 +1,6 @@
 use crate::types::HeatmapSpec;
 use crate::viewport::{ensure_finite, ScreenTransform};
-use crate::{backend_error, ensure_dimensions, PlotArea, PlotError};
+use crate::{backend_error, ensure_dimensions, font_family, PlotArea, PlotError};
 use plotters::prelude::*;
 
 const CAPTION_AREA_SIZE: i32 = 40;
@@ -273,7 +273,7 @@ where
                 spec.width as i32 / 2 - spec.title.len() as i32 * 7,
                 spec.margin as i32 + 8,
             ),
-            ("sans-serif", 22).into_font(),
+            (font_family(spec.font_family.as_deref()), 22).into_font(),
         ))
         .map_err(backend_error)?;
     }
@@ -289,7 +289,7 @@ where
         root.draw(&Text::new(
             label.clone(),
             (x, y),
-            ("sans-serif", 12).into_font(),
+            (font_family(spec.font_family.as_deref()), 12).into_font(),
         ))
         .map_err(backend_error)?;
     }
@@ -306,7 +306,7 @@ where
         root.draw(&Text::new(
             label.clone(),
             (x, y),
-            ("sans-serif", 12).into_font(),
+            (font_family(spec.font_family.as_deref()), 12).into_font(),
         ))
         .map_err(backend_error)?;
     }
@@ -358,7 +358,9 @@ where
                     root.draw(&Text::new(
                         text,
                         (screen_x - text_width, screen_y - 6),
-                        ("sans-serif", 11).into_font().color(text_color),
+                        (font_family(spec.font_family.as_deref()), 11)
+                            .into_font()
+                            .color(text_color),
                     ))
                     .map_err(backend_error)?;
                 }
@@ -396,13 +398,13 @@ where
     root.draw(&Text::new(
         format!("{v_max:.2}"),
         (legend_x + legend_bar_w + 4, legend_y_top),
-        ("sans-serif", 10).into_font(),
+        (font_family(spec.font_family.as_deref()), 10).into_font(),
     ))
     .map_err(backend_error)?;
     root.draw(&Text::new(
         format!("{v_min:.2}"),
         (legend_x + legend_bar_w + 4, legend_y_top + legend_h - 10),
-        ("sans-serif", 10).into_font(),
+        (font_family(spec.font_family.as_deref()), 10).into_font(),
     ))
     .map_err(backend_error)?;
 
@@ -438,6 +440,7 @@ mod tests {
             width: 480,
             height: 360,
             title: "Test Heatmap".to_string(),
+            font_family: None,
             row_labels: vec!["R0".to_string(), "R1".to_string()],
             col_labels: vec!["C0".to_string(), "C1".to_string(), "C2".to_string()],
             cells: vec![vec![0.0, 0.5, 1.0], vec![0.3, 0.7, 0.2]],

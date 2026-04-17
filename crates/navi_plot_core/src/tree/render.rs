@@ -1,4 +1,5 @@
 use super::*;
+use crate::font_family;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct TransitionNodeState {
@@ -82,6 +83,7 @@ where
             is_selected,
             &scaled_selection_style,
             spec.pixel_ratio,
+            spec.font_family.as_deref(),
             1.0,
             if is_selected { 1.0 } else { 0.0 },
         )?;
@@ -105,9 +107,10 @@ where
     }
 
     let title_size = (22.0 * spec.pixel_ratio.max(0.25)).round() as u32;
-    let title_style = TextStyle::from(("sans-serif", title_size).into_font())
-        .pos(Pos::new(HPos::Center, VPos::Center))
-        .color(&BLACK);
+    let title_style =
+        TextStyle::from((font_family(spec.font_family.as_deref()), title_size).into_font())
+            .pos(Pos::new(HPos::Center, VPos::Center))
+            .color(&BLACK);
     root.draw(&Text::new(
         spec.title.clone(),
         ((spec.width / 2) as i32, (spec.margin.max(28) / 2) as i32),
@@ -137,6 +140,7 @@ pub(super) fn draw_tree_node<DB>(
     is_selected: bool,
     selection_style: &crate::graph_style::ResolvedSelectionStyle,
     font_scale: f64,
+    font_family_name: Option<&str>,
     node_opacity_scale: f64,
     selection_opacity_scale: f64,
 ) -> Result<(), PlotError>
@@ -164,6 +168,7 @@ where
         is_selected && faded_selection_style.opacity > 0.0,
         &faded_selection_style,
         font_scale,
+        font_family_name,
     )
 }
 

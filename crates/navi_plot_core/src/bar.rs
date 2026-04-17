@@ -1,7 +1,7 @@
 use crate::color::parse_color;
 use crate::types::{BarChartSpec, BarVariant};
 use crate::viewport::{ensure_finite, ScreenTransform};
-use crate::{backend_error, ensure_dimensions, PlotArea, PlotError};
+use crate::{backend_error, ensure_dimensions, font_family, PlotArea, PlotError};
 use plotters::prelude::*;
 
 /// Default series color palette.
@@ -77,7 +77,7 @@ impl BarSession {
 
         let mut chart = ChartBuilder::on(&root)
             .margin(self.spec.margin)
-            .caption(title, ("sans-serif", 24))
+            .caption(title, (font_family(self.spec.font_family.as_deref()), 24))
             .x_label_area_size(X_LABEL_AREA_SIZE)
             .y_label_area_size(Y_LABEL_AREA_SIZE)
             .build_cartesian_2d(0f64..(n_cats as f64), 0f64..self.y_max)
@@ -91,6 +91,8 @@ impl BarSession {
             } else {
                 &self.spec.y_label
             })
+            .label_style((font_family(self.spec.font_family.as_deref()), 12))
+            .axis_desc_style((font_family(self.spec.font_family.as_deref()), 14))
             .bold_line_style(RGBColor(209, 213, 219))
             .light_line_style(RGBColor(229, 231, 235))
             .axis_style(BLACK.mix(0.85))
@@ -146,7 +148,7 @@ impl BarSession {
                 .draw(&Text::new(
                     cat.to_owned(),
                     (label_x, label_y),
-                    ("sans-serif", 13).into_font(),
+                    (font_family(self.spec.font_family.as_deref()), 13).into_font(),
                 ))
                 .map_err(backend_error)?;
         }
@@ -166,7 +168,7 @@ impl BarSession {
                     .draw(&Text::new(
                         series.label.as_str(),
                         (legend_x + 18, y),
-                        ("sans-serif", 12).into_font(),
+                        (font_family(self.spec.font_family.as_deref()), 12).into_font(),
                     ))
                     .map_err(backend_error)?;
             }
@@ -435,6 +437,7 @@ mod tests {
             width: 480,
             height: 320,
             title: "Test Bar".to_string(),
+            font_family: None,
             x_label: String::new(),
             y_label: String::new(),
             y_max: None,

@@ -12,6 +12,7 @@ fn sample_tree_spec() -> TreePlotSpec {
         width: 640,
         height: 420,
         title: "Tree".to_string(),
+        font_family: None,
         root_id: "root".to_string(),
         nodes: vec![
             crate::TreeNode {

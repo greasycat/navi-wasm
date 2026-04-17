@@ -1,4 +1,5 @@
 use super::*;
+use crate::font_family;
 
 mod badges;
 mod interaction;
@@ -29,7 +30,7 @@ where
             spec.width as i32 / 2 - spec.title.len() as i32 * 7,
             spec.margin as i32 / 2,
         ),
-        ("sans-serif", title_size).into_font(),
+        (font_family(spec.font_family.as_deref()), title_size).into_font(),
     ))
     .map_err(backend_error)?;
     Ok(())
@@ -142,9 +143,11 @@ where
                 let label_size = (12.0 * spec.pixel_ratio.max(0.25)).round() as u32;
                 let label_color = edge_style.label_color.unwrap_or(edge_style.stroke_color);
                 let text_color = label_color.mix(edge_style.opacity);
-                let text_style = TextStyle::from(("sans-serif", label_size).into_font())
-                    .pos(Pos::new(HPos::Center, VPos::Bottom))
-                    .color(&text_color);
+                let text_style = TextStyle::from(
+                    (font_family(spec.font_family.as_deref()), label_size).into_font(),
+                )
+                .pos(Pos::new(HPos::Center, VPos::Bottom))
+                .color(&text_color);
                 let mid_x = ((line_start_x + line_end_x) as f64 / 2.0).round() as i32;
                 let mid_y = ((line_start_y + line_end_y) as f64 / 2.0).round() as i32 - 4;
                 root.draw(&Text::new(label.to_owned(), (mid_x, mid_y), text_style))
@@ -188,6 +191,7 @@ where
             is_selected,
             &scaled_selection_style,
             spec.pixel_ratio,
+            spec.font_family.as_deref(),
         )?;
         if tracking.is_some_and(|tracking| tracking.is_traversed_node(node_spec.id.as_str())) {
             let tracking_outline = ShapeStyle::from(&TRACKING_NODE_BORDER_COLOR.mix(0.95))

@@ -64,6 +64,7 @@ pub(crate) fn with_network_session_mut<T>(
 
 pub(crate) fn create_network_session(canvas_id: &str, spec: JsValue) -> Result<u32, JsValue> {
     let spec: NetworkPlotSpec = from_value(spec).map_err(js_error)?;
+    let spec = normalize_network_spec_for_canvas(canvas_id, spec)?;
     let session = NetworkSession::new(spec).map_err(plot_error_to_js)?;
     let _ = canvas_by_id(canvas_id)?;
     NETWORK_SESSIONS.with(|store| Ok(store.borrow_mut().insert(canvas_id.to_string(), session)))
@@ -72,6 +73,7 @@ pub(crate) fn create_network_session(canvas_id: &str, spec: JsValue) -> Result<u
 pub(crate) fn update_network_session(handle: u32, spec: JsValue) -> Result<(), JsValue> {
     let spec: NetworkPlotSpec = from_value(spec).map_err(js_error)?;
     with_network_session_mut(handle, |entry| {
+        let spec = normalize_network_spec_for_canvas(&entry.canvas_id, spec)?;
         entry.session.update_spec(spec).map_err(plot_error_to_js)
     })
 }
@@ -247,6 +249,7 @@ pub(crate) fn destroy_network_session(handle: u32) -> Result<(), JsValue> {
 
 pub(crate) fn render_network(canvas_id: &str, spec: JsValue) -> Result<(), JsValue> {
     let spec: NetworkPlotSpec = from_value(spec).map_err(js_error)?;
+    let spec = normalize_network_spec_for_canvas(canvas_id, spec)?;
     let root = drawing_area(canvas_id, spec.width, spec.height)?;
     render_network_on(root, &spec).map_err(plot_error_to_js)?;
     let nodes = network_render_nodes(&spec).map_err(plot_error_to_js)?;

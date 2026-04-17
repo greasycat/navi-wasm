@@ -1,4 +1,5 @@
 use super::*;
+use crate::font_family;
 
 #[derive(Debug, Clone, Copy)]
 struct TransitionNodeState {
@@ -258,9 +259,11 @@ where
                 let label_size = (12.0 * spec.pixel_ratio.max(0.25)).round() as u32;
                 let label_color = edge_style.label_color.unwrap_or(edge_style.stroke_color);
                 let text_color = label_color.mix(edge_style.opacity * edge_alpha);
-                let text_style = TextStyle::from(("sans-serif", label_size).into_font())
-                    .pos(Pos::new(HPos::Center, VPos::Bottom))
-                    .color(&text_color);
+                let text_style = TextStyle::from(
+                    (font_family(spec.font_family.as_deref()), label_size).into_font(),
+                )
+                .pos(Pos::new(HPos::Center, VPos::Bottom))
+                .color(&text_color);
                 let mid_x = ((clipped_source.0 + clipped_target.0) as f64 / 2.0).round() as i32;
                 let mid_y = ((clipped_source.1 + clipped_target.1) as f64 / 2.0).round() as i32 - 4;
                 root.draw(&Text::new(label.to_owned(), (mid_x, mid_y), text_style))
@@ -321,6 +324,7 @@ where
             selection_alpha > 0.0,
             &scaled_selection_style,
             spec.pixel_ratio,
+            spec.font_family.as_deref(),
         )?;
 
         let render_spec = current_node.map(|_| spec).unwrap_or(&transition.from_spec);

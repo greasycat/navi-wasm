@@ -158,6 +158,7 @@ impl TreeSession {
                 selection_alpha > 0.0,
                 &scaled_selection_style,
                 self.spec.pixel_ratio,
+                self.spec.font_family.as_deref(),
                 node_state.opacity,
                 selection_alpha,
             )?;

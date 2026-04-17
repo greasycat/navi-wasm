@@ -28,6 +28,8 @@ export interface ScatterPlotSpec {
   width: number;
   height: number;
   title?: string;
+  /** Font family used for chart text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   x_label?: string;
   y_label?: string;
   /** [min, max]. Null triggers auto-range from data. */
@@ -157,9 +159,11 @@ export interface TreeEdge {
 export interface TreePlotSpec {
   width: number;
   height: number;
-  /** Device pixel ratio for HiDPI rendering. Default: 1.0 */
+  /** HiDPI canvas hint. Supports logical CSS sizing and legacy pre-scaled sizing. Default: 1.0 */
   pixel_ratio?: number;
   title?: string;
+  /** Font family used for graph text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   root_id: string;
   nodes: TreeNode[];
   edges: TreeEdge[];
@@ -207,6 +211,8 @@ export interface LinePlotSpec {
   width: number;
   height: number;
   title?: string;
+  /** Font family used for chart text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   x_label?: string;
   y_label?: string;
   x_range?: [number, number] | null;
@@ -232,6 +238,8 @@ export interface BarChartSpec {
   width: number;
   height: number;
   title?: string;
+  /** Font family used for chart text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   x_label?: string;
   y_label?: string;
   /** Explicit y-axis maximum. Null auto-scales. */
@@ -253,6 +261,8 @@ export interface HeatmapSpec {
   width: number;
   height: number;
   title?: string;
+  /** Font family used for chart text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   /** One label per row. Length must match cells.length. */
   row_labels?: string[];
   /** One label per column. Length must match cells[0].length. */
@@ -309,9 +319,11 @@ export interface NetworkEdge {
 export interface NetworkPlotSpec {
   width: number;
   height: number;
-  /** Device pixel ratio for HiDPI rendering. Default: 1.0 */
+  /** HiDPI canvas hint. Supports logical CSS sizing and legacy pre-scaled sizing. Default: 1.0 */
   pixel_ratio?: number;
   title?: string;
+  /** Font family used for graph text. Example: "Roboto, sans-serif". Default: "sans-serif" */
+  font_family?: string | null;
   nodes: NetworkNode[];
   edges: NetworkEdge[];
   /** Default: 16 */

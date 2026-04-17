@@ -4,7 +4,7 @@ use crate::viewport::{
     ensure_finite, resolve_axis_range, CartesianViewport, PixelBounds, CHART_MARGIN,
     X_LABEL_AREA_SIZE, Y_LABEL_AREA_SIZE,
 };
-use crate::{backend_error, ensure_dimensions, PlotArea, PlotError};
+use crate::{backend_error, ensure_dimensions, font_family, PlotArea, PlotError};
 use plotters::coord::cartesian::Cartesian2d;
 use plotters::coord::types::RangedCoordf64;
 use plotters::prelude::*;
@@ -114,6 +114,8 @@ impl LineSession {
             } else {
                 &self.spec.y_label
             })
+            .label_style((font_family(self.spec.font_family.as_deref()), 12))
+            .axis_desc_style((font_family(self.spec.font_family.as_deref()), 14))
             .bold_line_style(RGBColor(209, 213, 219))
             .light_line_style(RGBColor(229, 231, 235))
             .axis_style(BLACK.mix(0.85))
@@ -153,6 +155,7 @@ impl LineSession {
                 .configure_series_labels()
                 .position(SeriesLabelPosition::UpperLeft)
                 .margin(8)
+                .label_font((font_family(self.spec.font_family.as_deref()), 12))
                 .background_style(WHITE.mix(0.8))
                 .border_style(BLACK.mix(0.3))
                 .draw()
@@ -384,7 +387,7 @@ where
     };
     ChartBuilder::on(root)
         .margin(CHART_MARGIN)
-        .caption(title, ("sans-serif", 24))
+        .caption(title, (font_family(spec.font_family.as_deref()), 24))
         .x_label_area_size(X_LABEL_AREA_SIZE)
         .y_label_area_size(Y_LABEL_AREA_SIZE)
         .build_cartesian_2d(x_range.0..x_range.1, y_range.0..y_range.1)
@@ -403,6 +406,7 @@ mod tests {
             width: 480,
             height: 320,
             title: "Test Line".to_string(),
+            font_family: None,
             x_label: "x".to_string(),
             y_label: "y".to_string(),
             x_range: None,

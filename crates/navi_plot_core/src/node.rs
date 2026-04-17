@@ -1,7 +1,7 @@
 use crate::color::parse_color;
-use crate::graph_style::{ResolvedNodeStyle, ResolvedSelectionStyle};
+use crate::graph_style::{ResolvedNodeStyle, ResolvedSelectionStyle, ResolvedShadow};
 use crate::types::{BuiltinNodeIcon, NodeMedia, NodeMediaFit, NodeMediaKind, NodeShape};
-use crate::{backend_error, PlotArea, PlotError};
+use crate::{backend_error, font_family, PlotArea, PlotError};
 use plotters::prelude::*;
 use plotters::style::text_anchor::{HPos, Pos, VPos};
 use std::f64::consts::PI;
@@ -107,11 +107,16 @@ pub(crate) fn draw_node<DB>(
     is_selected: bool,
     selection_style: &ResolvedSelectionStyle,
     font_scale: f64,
+    font_family_name: Option<&str>,
 ) -> Result<(), PlotError>
 where
     DB: DrawingBackend,
     DB::ErrorType: std::fmt::Debug + std::error::Error + Send + Sync,
 {
+    if let Some(shadow) = &node_style.shadow {
+        draw_shadow(root, cx, cy, node_style.radius, &node_style.shape, shadow)?;
+    }
+
     if is_selected && selection_style.stroke_width > 0 {
         let ring_style =
             ShapeStyle::from(&selection_style.stroke_color.mix(selection_style.opacity))
@@ -165,14 +170,14 @@ where
 
         if label_inside {
             let size = (12.0 * scale).round() as u32;
-            let text_style = TextStyle::from(("sans-serif", size).into_font())
+            let text_style = TextStyle::from((font_family(font_family_name), size).into_font())
                 .pos(Pos::new(HPos::Center, VPos::Center))
                 .color(&text_color);
             root.draw(&Text::new(label.to_owned(), (cx, cy), text_style))
                 .map_err(backend_error)?;
         } else {
             let size = (13.0 * scale).round() as u32;
-            let text_style = TextStyle::from(("sans-serif", size).into_font())
+            let text_style = TextStyle::from((font_family(font_family_name), size).into_font())
                 .pos(Pos::new(HPos::Center, VPos::Top))
                 .color(&text_color);
             root.draw(&Text::new(
@@ -219,6 +224,41 @@ where
         node_style.fill_color,
         opacity,
     )
+}
+
+fn draw_shadow<DB>(
+    root: &PlotArea<DB>,
+    cx: i32,
+    cy: i32,
+    radius: i32,
+    shape: &NodeShape,
+    shadow: &ResolvedShadow,
+) -> Result<(), PlotError>
+where
+    DB: DrawingBackend,
+    DB::ErrorType: std::fmt::Debug + std::error::Error + Send + Sync,
+{
+    let sx = cx + shadow.offset_x;
+    let sy = cy + shadow.offset_y;
+
+    if shadow.blur == 0 {
+        let style = ShapeStyle::from(&shadow.color.mix(shadow.opacity)).filled();
+        return draw_shape(root, sx, sy, radius, shape, style);
+    }
+
+    // Draw outermost (largest, most transparent) first so inner rings paint on top.
+    let layers = shadow.blur;
+    for i in 0..=layers {
+        let layer_radius = (radius + layers - i).max(1);
+        let t = i as f64 / layers as f64; // 0 at outermost edge, 1 at node edge
+        let layer_opacity = shadow.opacity * (-3.0 * (1.0 - t) * (1.0 - t)).exp();
+        if layer_opacity < 0.005 {
+            continue;
+        }
+        let style = ShapeStyle::from(&shadow.color.mix(layer_opacity)).filled();
+        draw_shape(root, sx, sy, layer_radius, shape, style)?;
+    }
+    Ok(())
 }
 
 pub(crate) fn draw_shape<DB>(
