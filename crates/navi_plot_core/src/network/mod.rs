@@ -54,6 +54,7 @@ const RADIAL_PARENT_SPRING: f64 = 0.05;
 const RADIAL_REPULSION_FORCE: f64 = 0.18;
 const TOGGLEABLE_PROPERTY_KEY: &str = "navil_toggleable";
 const EXPANDED_PROPERTY_KEY: &str = "navil_expanded";
+const LAYOUT_INERT_PROPERTY_KEY: &str = "navil_layout_inert";
 const TOGGLE_BADGE_MIN_RADIUS: i32 = 5;
 const TOGGLE_BADGE_MAX_RADIUS: i32 = 8;
 const TOGGLE_BADGE_FILL: RGBColor = RGBColor(148, 163, 184);

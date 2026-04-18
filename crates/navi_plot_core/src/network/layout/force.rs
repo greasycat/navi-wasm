@@ -28,6 +28,7 @@ pub(in crate::network) fn relax_positions(
     let world_span = estimate_world_span(spec, positions.iter().copied());
     let spring_length = ((world_span * world_span) / n as f64).sqrt().max(1.0);
     let mut temperature = (world_span * 0.12).max(WORLD_NODE_SPACING * 0.35);
+    let inert: Vec<bool> = spec.nodes.iter().map(node_is_layout_inert).collect();
 
     for _ in 0..iterations {
         let mut displacement = vec![(0.0, 0.0); n];
@@ -40,6 +41,9 @@ pub(in crate::network) fn relax_positions(
                 if source_idx == target_idx {
                     continue;
                 }
+                if inert[target_idx] {
+                    continue;
+                }
                 let dx = positions[source_idx].0 - positions[target_idx].0;
                 let dy = positions[source_idx].1 - positions[target_idx].1;
                 let distance = (dx * dx + dy * dy).sqrt().max(0.01);
@@ -50,6 +54,9 @@ pub(in crate::network) fn relax_positions(
         }
 
         for &(source_idx, target_idx, weight) in &adjacency {
+            if inert[source_idx] || inert[target_idx] {
+                continue;
+            }
             let dx = positions[target_idx].0 - positions[source_idx].0;
             let dy = positions[target_idx].1 - positions[source_idx].1;
             let distance = (dx * dx + dy * dy).sqrt().max(0.01);

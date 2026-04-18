@@ -169,14 +169,14 @@ where
         let text_color = resolved_label_color.mix(node_style.opacity);
 
         if label_inside {
-            let size = (12.0 * scale).round() as u32;
+            let size = (18.0 * scale).round() as u32;
             let text_style = TextStyle::from((font_family(font_family_name), size).into_font())
                 .pos(Pos::new(HPos::Center, VPos::Center))
                 .color(&text_color);
             root.draw(&Text::new(label.to_owned(), (cx, cy), text_style))
                 .map_err(backend_error)?;
         } else {
-            let size = (13.0 * scale).round() as u32;
+            let size = (19.0 * scale).round() as u32;
             let text_style = TextStyle::from((font_family(font_family_name), size).into_font())
                 .pos(Pos::new(HPos::Center, VPos::Top))
                 .color(&text_color);

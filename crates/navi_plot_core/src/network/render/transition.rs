@@ -256,7 +256,7 @@ where
                 .as_deref()
                 .filter(|label| !label.is_empty())
             {
-                let label_size = (12.0 * spec.pixel_ratio.max(0.25)).round() as u32;
+                let label_size = (18.0 * spec.pixel_ratio.max(0.25) * view.zoom).round().max(1.0) as u32;
                 let label_color = edge_style.label_color.unwrap_or(edge_style.stroke_color);
                 let text_color = label_color.mix(edge_style.opacity * edge_alpha);
                 let text_style = TextStyle::from(
@@ -323,7 +323,7 @@ where
             resolved_node.label.as_str(),
             selection_alpha > 0.0,
             &scaled_selection_style,
-            spec.pixel_ratio,
+            spec.pixel_ratio * view.zoom,
             spec.font_family.as_deref(),
         )?;
 

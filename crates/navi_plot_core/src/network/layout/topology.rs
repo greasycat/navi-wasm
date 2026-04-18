@@ -101,6 +101,10 @@ pub(in crate::network) fn node_has_toggle_badge(node: &crate::NetworkNode) -> bo
     node_property_is_true(node, TOGGLEABLE_PROPERTY_KEY)
 }
 
+pub(in crate::network) fn node_is_layout_inert(node: &crate::NetworkNode) -> bool {
+    node_property_is_true(node, LAYOUT_INERT_PROPERTY_KEY)
+}
+
 pub(in crate::network) fn node_badge_expanded(node: &crate::NetworkNode) -> bool {
     node_property_is_true(node, EXPANDED_PROPERTY_KEY)
 }
