@@ -342,6 +342,12 @@ export interface NetworkPlotSpec {
   selected_node_id?: string | null;
   /** FR layout iterations. Ignored for nodes that supply x/y. Default: 100 */
   layout_iterations?: number;
+  /** Multiplier on computed FR spring length. Higher = more spacing. Default: 1.0 */
+  spring_length_scale?: number;
+  /** Multiplier on initial FR temperature. Higher = more initial movement. Default: 1.0 */
+  temperature_scale?: number;
+  /** Per-iteration temperature cooling factor (0–1). Lower = faster convergence. Default: 0.92 */
+  cooling_rate?: number;
   /** Draw arrowheads on directed edges. Default: true */
   show_arrows?: boolean;
   /** Draw node labels. Default: true */

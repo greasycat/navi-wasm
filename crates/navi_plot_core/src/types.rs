@@ -551,6 +551,15 @@ pub struct NetworkPlotSpec {
     /// Fruchterman-Reingold iterations for free nodes. Default: 100.
     #[serde(default = "default_fr_iterations")]
     pub layout_iterations: u32,
+    /// Multiplier on the computed FR spring length. Default: 1.0.
+    #[serde(default = "default_spring_length_scale")]
+    pub spring_length_scale: f64,
+    /// Multiplier on the initial FR temperature. Default: 1.0.
+    #[serde(default = "default_temperature_scale")]
+    pub temperature_scale: f64,
+    /// Per-iteration temperature cooling multiplier (0 < x < 1). Default: 0.92.
+    #[serde(default = "default_cooling_rate")]
+    pub cooling_rate: f64,
     /// Draw arrowheads on directed edges. Default: `true`.
     #[serde(default = "default_true")]
     pub show_arrows: bool,
@@ -659,6 +668,18 @@ fn default_network_margin() -> u32 {
 
 fn default_fr_iterations() -> u32 {
     100
+}
+
+fn default_spring_length_scale() -> f64 {
+    1.0
+}
+
+fn default_temperature_scale() -> f64 {
+    1.0
+}
+
+fn default_cooling_rate() -> f64 {
+    0.92
 }
 
 pub(crate) fn default_pixel_ratio() -> f64 {
