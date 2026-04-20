@@ -107,3 +107,49 @@ fn network_rejects_invalid_dash_pattern_values() {
         }
     );
 }
+
+#[test]
+fn network_subgraph_keeps_only_included_nodes_and_induced_edges() {
+    let mut spec = sample_spec();
+    spec.selected_node_id = Some("b".to_string());
+
+    let filtered = create_network_subgraph(&spec, vec!["a".to_string(), "b".to_string()]).unwrap();
+
+    assert_eq!(filtered.nodes.iter().map(|node| node.id.as_str()).collect::<Vec<_>>(), vec!["a", "b"]);
+    assert_eq!(
+        filtered
+            .edges
+            .iter()
+            .map(|edge| (edge.source.as_str(), edge.target.as_str()))
+            .collect::<Vec<_>>(),
+        vec![("a", "b")]
+    );
+    assert_eq!(filtered.selected_node_id.as_deref(), Some("b"));
+}
+
+#[test]
+fn network_subgraph_clears_selection_when_selected_node_is_excluded() {
+    let mut spec = sample_spec();
+    spec.selected_node_id = Some("c".to_string());
+
+    let filtered = create_network_subgraph(&spec, vec!["a".to_string(), "b".to_string()]).unwrap();
+
+    assert_eq!(filtered.selected_node_id, None);
+}
+
+#[test]
+fn network_subgraph_rejects_unknown_nodes() {
+    let err = create_network_subgraph(&sample_spec(), vec!["missing".to_string()]).unwrap_err();
+    assert_eq!(
+        err,
+        PlotError::UnknownNode {
+            node_id: "missing".to_string(),
+        }
+    );
+}
+
+#[test]
+fn network_subgraph_rejects_empty_include_set() {
+    let err = create_network_subgraph(&sample_spec(), vec![]).unwrap_err();
+    assert_eq!(err, PlotError::EmptyNetwork);
+}

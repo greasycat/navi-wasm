@@ -526,6 +526,9 @@ pub(in crate::network) fn relax_radial_positions(
     base_spacing: f64,
     origin: (f64, f64),
     positions: &mut [(f64, f64)],
+    movable: &[bool],
+    force_layers: &[Vec<i32>],
+    ordered_passes: &[i32],
     iterations: usize,
 ) {
     if positions.is_empty() {
@@ -535,99 +538,123 @@ pub(in crate::network) fn relax_radial_positions(
     let max_iterations = iterations.max(1).min(LOCAL_RELAXATION_MAX_ITERATIONS);
 
     for _ in 0..max_iterations {
-        let mut displacement = vec![(0.0, 0.0); positions.len()];
+        for &layer in ordered_passes {
+            let mut displacement = vec![(0.0, 0.0); positions.len()];
+            let mut has_active = false;
 
-        for source_idx in 0..positions.len() {
-            if source_idx == hierarchy.root_idx {
-                continue;
-            }
-            for target_idx in (source_idx + 1)..positions.len() {
-                if target_idx == hierarchy.root_idx {
+            for source_idx in 0..positions.len() {
+                if source_idx == hierarchy.root_idx
+                    || !movable[source_idx]
+                    || !node_is_in_force_layer(&force_layers[source_idx], layer)
+                {
                     continue;
                 }
-                let depth_gap =
-                    hierarchy.depth_by_idx[source_idx].abs_diff(hierarchy.depth_by_idx[target_idx]);
-                if depth_gap > 1 {
+                has_active = true;
+                for target_idx in (source_idx + 1)..positions.len() {
+                    if target_idx == hierarchy.root_idx
+                        || !node_is_in_force_layer(&force_layers[target_idx], layer)
+                    {
+                        continue;
+                    }
+                    let depth_gap = hierarchy.depth_by_idx[source_idx]
+                        .abs_diff(hierarchy.depth_by_idx[target_idx]);
+                    if depth_gap > 1 {
+                        continue;
+                    }
+
+                    let dx = positions[source_idx].0 - positions[target_idx].0;
+                    let dy = positions[source_idx].1 - positions[target_idx].1;
+                    let dist = (dx * dx + dy * dy).sqrt().max(0.01);
+                    let force = (RADIAL_REPULSION_FORCE * base_spacing * base_spacing / dist)
+                        / (depth_gap as f64 + 1.0);
+                    let fx = dx / dist * force;
+                    let fy = dy / dist * force;
+                    displacement[source_idx].0 += fx;
+                    displacement[source_idx].1 += fy;
+                    if movable[target_idx] {
+                        displacement[target_idx].0 -= fx;
+                        displacement[target_idx].1 -= fy;
+                    }
+                }
+            }
+
+            if !has_active {
+                continue;
+            }
+
+            for idx in 0..positions.len() {
+                if idx == hierarchy.root_idx
+                    || !movable[idx]
+                    || !node_is_in_force_layer(&force_layers[idx], layer)
+                {
                     continue;
                 }
 
-                let dx = positions[source_idx].0 - positions[target_idx].0;
-                let dy = positions[source_idx].1 - positions[target_idx].1;
-                let dist = (dx * dx + dy * dy).sqrt().max(0.01);
-                let force = (RADIAL_REPULSION_FORCE * base_spacing * base_spacing / dist)
-                    / (depth_gap as f64 + 1.0);
-                let fx = dx / dist * force;
-                let fy = dy / dist * force;
-                displacement[source_idx].0 += fx;
-                displacement[source_idx].1 += fy;
-                displacement[target_idx].0 -= fx;
-                displacement[target_idx].1 -= fy;
-            }
-        }
+                let target = targets[idx];
+                let (radius, angle) =
+                    polar_from_position_unwrapped(origin, positions[idx], target.angle);
+                let radial_dir = if radius > 0.01 {
+                    (
+                        (positions[idx].0 - origin.0) / radius,
+                        (positions[idx].1 - origin.1) / radius,
+                    )
+                } else {
+                    (target.angle.cos(), target.angle.sin())
+                };
+                let tangent_dir = (-radial_dir.1, radial_dir.0);
+                let radius_error = target.radius - radius;
+                let angle_error = target.angle - angle;
+                displacement[idx].0 += radial_dir.0 * radius_error * RADIAL_RADIUS_SPRING;
+                displacement[idx].1 += radial_dir.1 * radius_error * RADIAL_RADIUS_SPRING;
+                displacement[idx].0 += tangent_dir.0
+                    * angle_error
+                    * target.radius.max(base_spacing * 0.6)
+                    * RADIAL_ANGLE_SPRING;
+                displacement[idx].1 += tangent_dir.1
+                    * angle_error
+                    * target.radius.max(base_spacing * 0.6)
+                    * RADIAL_ANGLE_SPRING;
 
-        for idx in 0..positions.len() {
-            if idx == hierarchy.root_idx {
-                continue;
-            }
-
-            let target = targets[idx];
-            let (radius, angle) =
-                polar_from_position_unwrapped(origin, positions[idx], target.angle);
-            let radial_dir = if radius > 0.01 {
-                (
-                    (positions[idx].0 - origin.0) / radius,
-                    (positions[idx].1 - origin.1) / radius,
-                )
-            } else {
-                (target.angle.cos(), target.angle.sin())
-            };
-            let tangent_dir = (-radial_dir.1, radial_dir.0);
-            let radius_error = target.radius - radius;
-            let angle_error = target.angle - angle;
-            displacement[idx].0 += radial_dir.0 * radius_error * RADIAL_RADIUS_SPRING;
-            displacement[idx].1 += radial_dir.1 * radius_error * RADIAL_RADIUS_SPRING;
-            displacement[idx].0 += tangent_dir.0
-                * angle_error
-                * target.radius.max(base_spacing * 0.6)
-                * RADIAL_ANGLE_SPRING;
-            displacement[idx].1 += tangent_dir.1
-                * angle_error
-                * target.radius.max(base_spacing * 0.6)
-                * RADIAL_ANGLE_SPRING;
-
-            if let Some(parent_idx) = hierarchy.parent_by_idx[idx] {
-                let dx = positions[parent_idx].0 - positions[idx].0;
-                let dy = positions[parent_idx].1 - positions[idx].1;
-                let dist = (dx * dx + dy * dy).sqrt().max(0.01);
-                let desired = (targets[idx].radius - targets[parent_idx].radius)
-                    .abs()
-                    .max(base_spacing * 0.72);
-                let stretch = dist - desired;
-                let fx = dx / dist * stretch * RADIAL_PARENT_SPRING;
-                let fy = dy / dist * stretch * RADIAL_PARENT_SPRING;
-                displacement[idx].0 += fx;
-                displacement[idx].1 += fy;
-                if parent_idx != hierarchy.root_idx {
-                    displacement[parent_idx].0 -= fx;
-                    displacement[parent_idx].1 -= fy;
+                if let Some(parent_idx) = hierarchy.parent_by_idx[idx] {
+                    let dx = positions[parent_idx].0 - positions[idx].0;
+                    let dy = positions[parent_idx].1 - positions[idx].1;
+                    let dist = (dx * dx + dy * dy).sqrt().max(0.01);
+                    let desired = (targets[idx].radius - targets[parent_idx].radius)
+                        .abs()
+                        .max(base_spacing * 0.72);
+                    let stretch = dist - desired;
+                    let fx = dx / dist * stretch * RADIAL_PARENT_SPRING;
+                    let fy = dy / dist * stretch * RADIAL_PARENT_SPRING;
+                    displacement[idx].0 += fx;
+                    displacement[idx].1 += fy;
+                    if parent_idx != hierarchy.root_idx
+                        && movable[parent_idx]
+                        && node_is_in_force_layer(&force_layers[parent_idx], layer)
+                    {
+                        displacement[parent_idx].0 -= fx;
+                        displacement[parent_idx].1 -= fy;
+                    }
                 }
             }
-        }
 
-        for idx in 0..positions.len() {
-            if idx == hierarchy.root_idx {
-                positions[idx] = origin;
-                continue;
+            for idx in 0..positions.len() {
+                if idx == hierarchy.root_idx {
+                    positions[idx] = origin;
+                    continue;
+                }
+                if !movable[idx] || !node_is_in_force_layer(&force_layers[idx], layer) {
+                    continue;
+                }
+                let magnitude = (displacement[idx].0 * displacement[idx].0
+                    + displacement[idx].1 * displacement[idx].1)
+                    .sqrt()
+                    .max(0.01);
+                let scale = magnitude.min(temperature) / magnitude;
+                positions[idx].0 += displacement[idx].0 * scale;
+                positions[idx].1 += displacement[idx].1 * scale;
             }
-            let magnitude = (displacement[idx].0 * displacement[idx].0
-                + displacement[idx].1 * displacement[idx].1)
-                .sqrt()
-                .max(0.01);
-            let scale = magnitude.min(temperature) / magnitude;
-            positions[idx].0 += displacement[idx].0 * scale;
-            positions[idx].1 += displacement[idx].1 * scale;
+            constrain_radial_positions(hierarchy, targets, origin, positions);
         }
-        constrain_radial_positions(hierarchy, targets, origin, positions);
         temperature *= 0.9;
     }
 }
@@ -661,6 +688,8 @@ pub(in crate::network) fn compute_radial_layout_with_zoom(
         previous_root_anchors.as_ref(),
     );
     let origin = radial_origin(spec, hierarchy);
+    let force_layers = resolved_force_layers(spec, Some(hierarchy));
+    let ordered_passes = ordered_force_passes(&force_layers);
     let mut positions: Vec<(f64, f64)> = spec
         .nodes
         .iter()
@@ -677,6 +706,105 @@ pub(in crate::network) fn compute_radial_layout_with_zoom(
             }
         })
         .collect();
+    let movable: Vec<bool> = if let Some(previous_spec) = previous_spec {
+        let previous_nodes_by_id: HashMap<&str, &crate::NetworkNode> = previous_spec
+            .nodes
+            .iter()
+            .map(|node| (node.id.as_str(), node))
+            .collect();
+        let next_ids = spec
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<HashSet<_>>();
+        let current_parent_by_id = structural_parent_map(spec);
+        let previous_parent_by_id = structural_parent_map(previous_spec);
+        let mut changed_ids = HashSet::new();
+
+        for node in &spec.nodes {
+            let previous_node = previous_nodes_by_id.get(node.id.as_str()).copied();
+            let parent_changed = current_parent_by_id.get(node.id.as_str()).copied()
+                != previous_parent_by_id.get(node.id.as_str()).copied();
+            let layers_changed = previous_node
+                .map(|previous| previous.force_layers.as_ref() != node.force_layers.as_ref())
+                .unwrap_or(false);
+            if previous_node.is_none() || parent_changed || layers_changed {
+                changed_ids.insert(node.id.clone());
+            }
+        }
+
+        for node in &previous_spec.nodes {
+            if next_ids.contains(node.id.as_str()) {
+                continue;
+            }
+            if let Some(parent_id) = previous_parent_by_id.get(node.id.as_str()).copied() {
+                changed_ids.insert(parent_id.to_string());
+            }
+        }
+
+        if changed_ids.is_empty() {
+            spec.nodes
+                .iter()
+                .enumerate()
+                .map(|(idx, node)| idx != hierarchy.root_idx && !node_is_pinned(node))
+                .collect()
+        } else {
+            let mut locally_movable = changed_ids.clone();
+            let mut frontier = changed_ids.iter().cloned().collect::<Vec<_>>();
+            while let Some(node_id) = frontier.pop() {
+                let parent_id = current_parent_by_id
+                    .get(node_id.as_str())
+                    .copied()
+                    .or_else(|| previous_parent_by_id.get(node_id.as_str()).copied());
+                let Some(parent_id) = parent_id else {
+                    continue;
+                };
+                let parent_id = parent_id.to_string();
+                if locally_movable.insert(parent_id.clone()) {
+                    frontier.push(parent_id);
+                }
+            }
+
+            let local_snapshot = locally_movable.iter().cloned().collect::<Vec<_>>();
+            for node_id in local_snapshot {
+                for neighbor_id in neighbor_ids(spec, &node_id) {
+                    locally_movable.insert(neighbor_id);
+                }
+            }
+
+            let affected_layers: HashSet<i32> = spec
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(_, node)| locally_movable.contains(node.id.as_str()))
+                .flat_map(|(idx, _)| force_layers[idx].iter().copied())
+                .collect();
+            for (idx, node) in spec.nodes.iter().enumerate() {
+                if force_layers[idx]
+                    .iter()
+                    .any(|layer| affected_layers.contains(layer))
+                {
+                    locally_movable.insert(node.id.clone());
+                }
+            }
+
+            spec.nodes
+                .iter()
+                .enumerate()
+                .map(|(idx, node)| {
+                    idx != hierarchy.root_idx
+                        && !node_is_pinned(node)
+                        && locally_movable.contains(node.id.as_str())
+                })
+                .collect()
+        }
+    } else {
+        spec.nodes
+            .iter()
+            .enumerate()
+            .map(|(idx, node)| idx != hierarchy.root_idx && !node_is_pinned(node))
+            .collect()
+    };
     constrain_radial_positions(hierarchy, &targets, origin, &mut positions);
     relax_radial_positions(
         hierarchy,
@@ -684,6 +812,9 @@ pub(in crate::network) fn compute_radial_layout_with_zoom(
         base_spacing,
         origin,
         &mut positions,
+        &movable,
+        &force_layers,
+        &ordered_passes,
         spec.layout_iterations as usize,
     );
 

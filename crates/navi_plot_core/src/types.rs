@@ -636,6 +636,11 @@ pub struct NetworkNode {
     /// Optional icon or registered image rendered inside the node.
     #[serde(default)]
     pub media: Option<NodeMedia>,
+    /// Ordered force-layer memberships for sequential network layout passes.
+    /// When omitted, the network layout falls back to depth-based or root-only
+    /// memberships depending on the graph shape.
+    #[serde(default)]
+    pub force_layers: Option<Vec<i32>>,
     #[serde(default)]
     pub properties: BTreeMap<String, String>,
 }

@@ -22,6 +22,58 @@ pub(in crate::network) fn edge_is_structural(edge: &crate::NetworkEdge) -> bool 
     edge.weight.unwrap_or(1.0) >= STRUCTURAL_EDGE_WEIGHT_THRESHOLD
 }
 
+pub(in crate::network) fn dedupe_force_layers(layers: &[i32]) -> Vec<i32> {
+    let mut seen = HashSet::new();
+    let mut deduped = Vec::with_capacity(layers.len());
+    for &layer in layers {
+        if seen.insert(layer) {
+            deduped.push(layer);
+        }
+    }
+    deduped
+}
+
+pub(in crate::network) fn resolved_force_layers(
+    spec: &NetworkPlotSpec,
+    hierarchy: Option<&HierarchicalLayout>,
+) -> Vec<Vec<i32>> {
+    spec.nodes
+        .iter()
+        .enumerate()
+        .map(|(idx, node)| {
+            let explicit = node
+                .force_layers
+                .as_deref()
+                .map(dedupe_force_layers)
+                .filter(|layers| !layers.is_empty());
+            explicit.unwrap_or_else(|| match hierarchy {
+                Some(hierarchy) => vec![hierarchy.depth_by_idx[idx] as i32],
+                None => vec![0],
+            })
+        })
+        .collect()
+}
+
+pub(in crate::network) fn ordered_force_passes(force_layers: &[Vec<i32>]) -> Vec<i32> {
+    let mut seen = HashSet::new();
+    let mut ordered = Vec::new();
+    for layers in force_layers {
+        for &layer in layers {
+            if seen.insert(layer) {
+                ordered.push(layer);
+            }
+        }
+    }
+    if ordered.is_empty() {
+        ordered.push(0);
+    }
+    ordered
+}
+
+pub(in crate::network) fn node_is_in_force_layer(force_layers: &[i32], layer: i32) -> bool {
+    force_layers.contains(&layer)
+}
+
 pub(in crate::network) fn neighbor_ids(spec: &NetworkPlotSpec, node_id: &str) -> Vec<String> {
     let mut neighbors = Vec::new();
     for edge in &spec.edges {

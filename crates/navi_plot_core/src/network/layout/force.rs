@@ -29,61 +29,78 @@ pub(in crate::network) fn relax_positions(
     let spring_length = (((world_span * world_span) / n as f64).sqrt() * spec.spring_length_scale).max(1.0);
     let mut temperature = (world_span * 0.12 * spec.temperature_scale).max(WORLD_NODE_SPACING * 0.35);
     let inert: Vec<bool> = spec.nodes.iter().map(node_is_layout_inert).collect();
+    let force_layers = resolved_force_layers(spec, None);
+    let ordered_passes = ordered_force_passes(&force_layers);
 
     for _ in 0..iterations {
-        let mut displacement = vec![(0.0, 0.0); n];
+        for &layer in &ordered_passes {
+            let mut displacement = vec![(0.0, 0.0); n];
+            let mut has_movable = false;
 
-        for source_idx in 0..n {
-            if !movable[source_idx] {
+            for source_idx in 0..n {
+                if !movable[source_idx]
+                    || inert[source_idx]
+                    || !node_is_in_force_layer(&force_layers[source_idx], layer)
+                {
+                    continue;
+                }
+                has_movable = true;
+                for target_idx in 0..n {
+                    if source_idx == target_idx
+                        || inert[target_idx]
+                        || !node_is_in_force_layer(&force_layers[target_idx], layer)
+                    {
+                        continue;
+                    }
+                    let dx = positions[source_idx].0 - positions[target_idx].0;
+                    let dy = positions[source_idx].1 - positions[target_idx].1;
+                    let distance = (dx * dx + dy * dy).sqrt().max(0.01);
+                    let force = spring_length * spring_length / distance;
+                    displacement[source_idx].0 += dx / distance * force;
+                    displacement[source_idx].1 += dy / distance * force;
+                }
+            }
+
+            if !has_movable {
                 continue;
             }
-            for target_idx in 0..n {
-                if source_idx == target_idx {
+
+            for &(source_idx, target_idx, weight) in &adjacency {
+                if inert[source_idx]
+                    || inert[target_idx]
+                    || !node_is_in_force_layer(&force_layers[source_idx], layer)
+                    || !node_is_in_force_layer(&force_layers[target_idx], layer)
+                {
                     continue;
                 }
-                if inert[target_idx] {
-                    continue;
-                }
-                let dx = positions[source_idx].0 - positions[target_idx].0;
-                let dy = positions[source_idx].1 - positions[target_idx].1;
+                let dx = positions[target_idx].0 - positions[source_idx].0;
+                let dy = positions[target_idx].1 - positions[source_idx].1;
                 let distance = (dx * dx + dy * dy).sqrt().max(0.01);
-                let force = spring_length * spring_length / distance;
-                displacement[source_idx].0 += dx / distance * force;
-                displacement[source_idx].1 += dy / distance * force;
+                let force = (distance * distance / spring_length).max(0.01) * weight;
+                let fx = dx / distance * force;
+                let fy = dy / distance * force;
+                if movable[source_idx] {
+                    displacement[source_idx].0 += fx;
+                    displacement[source_idx].1 += fy;
+                }
+                if movable[target_idx] {
+                    displacement[target_idx].0 -= fx;
+                    displacement[target_idx].1 -= fy;
+                }
             }
-        }
 
-        for &(source_idx, target_idx, weight) in &adjacency {
-            if inert[source_idx] || inert[target_idx] {
-                continue;
+            for idx in 0..n {
+                if !movable[idx] || !node_is_in_force_layer(&force_layers[idx], layer) {
+                    continue;
+                }
+                let displacement_len = (displacement[idx].0 * displacement[idx].0
+                    + displacement[idx].1 * displacement[idx].1)
+                    .sqrt()
+                    .max(0.01);
+                let scale = displacement_len.min(temperature) / displacement_len;
+                positions[idx].0 += displacement[idx].0 * scale;
+                positions[idx].1 += displacement[idx].1 * scale;
             }
-            let dx = positions[target_idx].0 - positions[source_idx].0;
-            let dy = positions[target_idx].1 - positions[source_idx].1;
-            let distance = (dx * dx + dy * dy).sqrt().max(0.01);
-            let force = (distance * distance / spring_length).max(0.01) * weight;
-            let fx = dx / distance * force;
-            let fy = dy / distance * force;
-            if movable[source_idx] {
-                displacement[source_idx].0 += fx;
-                displacement[source_idx].1 += fy;
-            }
-            if movable[target_idx] {
-                displacement[target_idx].0 -= fx;
-                displacement[target_idx].1 -= fy;
-            }
-        }
-
-        for idx in 0..n {
-            if !movable[idx] {
-                continue;
-            }
-            let displacement_len = (displacement[idx].0 * displacement[idx].0
-                + displacement[idx].1 * displacement[idx].1)
-                .sqrt()
-                .max(0.01);
-            let scale = displacement_len.min(temperature) / displacement_len;
-            positions[idx].0 += displacement[idx].0 * scale;
-            positions[idx].1 += displacement[idx].1 * scale;
         }
 
         temperature *= spec.cooling_rate.clamp(0.01, 0.999);
@@ -198,6 +215,11 @@ pub(in crate::network) fn compute_layout_from_previous_with_zoom(
 
     let previous_adjacency = adjacency_map(previous_spec);
     let next_adjacency = adjacency_map(spec);
+    let previous_nodes_by_id: HashMap<&str, &crate::NetworkNode> = previous_spec
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node))
+        .collect();
     let removed_neighbor_ids: HashSet<String> = spec
         .nodes
         .iter()
@@ -220,6 +242,10 @@ pub(in crate::network) fn compute_layout_from_previous_with_zoom(
         let previous_neighbors = previous_adjacency.get(&node.id);
         let next_neighbors = next_adjacency.get(&node.id);
         let neighbors_changed = previous_neighbors != next_neighbors;
+        let force_layers_changed = previous_nodes_by_id
+            .get(node.id.as_str())
+            .map(|previous| previous.force_layers.as_ref() != node.force_layers.as_ref())
+            .unwrap_or(true);
         let position = if node_is_pinned(node) {
             let position = (node.x.unwrap(), node.y.unwrap());
             if previous_layout.get(&node.id).copied() != Some(position) {
@@ -227,7 +253,7 @@ pub(in crate::network) fn compute_layout_from_previous_with_zoom(
             }
             position
         } else if let Some(previous) = previous_layout.get(&node.id).copied() {
-            if neighbors_changed {
+            if neighbors_changed || force_layers_changed {
                 changed_ids.insert(node.id.clone());
             }
             previous
@@ -243,9 +269,25 @@ pub(in crate::network) fn compute_layout_from_previous_with_zoom(
     }
 
     let mut relaxed_ids = changed_ids.clone();
+    let force_layers = resolved_force_layers(spec, None);
+    let affected_layers: HashSet<i32> = spec
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| changed_ids.contains(node.id.as_str()))
+        .flat_map(|(idx, _)| force_layers[idx].iter().copied())
+        .collect();
     for node_id in &changed_ids {
         for neighbor_id in neighbor_ids(spec, node_id) {
             relaxed_ids.insert(neighbor_id);
+        }
+    }
+    for (idx, node) in spec.nodes.iter().enumerate() {
+        if force_layers[idx]
+            .iter()
+            .any(|layer| affected_layers.contains(layer))
+        {
+            relaxed_ids.insert(node.id.clone());
         }
     }
 

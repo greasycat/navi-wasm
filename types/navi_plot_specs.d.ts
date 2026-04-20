@@ -303,6 +303,8 @@ export interface NetworkNode {
   style?: GraphNodeStyle | null;
   /** Optional built-in icon or registered image rendered inside the node. */
   media?: NodeMedia | null;
+  /** Ordered force-layer memberships for sequential network layout passes. */
+  force_layers?: number[] | null;
   properties?: Record<string, string>;
 }
 

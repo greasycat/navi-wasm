@@ -2,9 +2,9 @@ use super::*;
 use crate::font_family;
 
 #[derive(Debug, Clone, Copy)]
-struct TransitionNodeState {
-    point: (f64, f64),
-    opacity: f64,
+pub(in crate::network) struct TransitionNodeState {
+    pub(in crate::network) point: (f64, f64),
+    pub(in crate::network) opacity: f64,
 }
 
 fn project_point_f64(point: (f64, f64), view: &ScreenTransform) -> (i32, i32) {
@@ -18,31 +18,65 @@ fn lerp_point(from: (f64, f64), to: (f64, f64), progress: f64) -> (f64, f64) {
     )
 }
 
+fn transition_anchor_frame_for_id(
+    transition: &NetworkTransition,
+    to_layout: &BTreeMap<String, (f64, f64)>,
+    anchor_node_id: &str,
+    progress: f64,
+) -> (f64, f64) {
+    let anchor_from = transition
+        .from_layout
+        .get(anchor_node_id)
+        .copied()
+        .or_else(|| to_layout.get(anchor_node_id).copied())
+        .unwrap_or((0.0, 0.0));
+    let anchor_to = to_layout
+        .get(anchor_node_id)
+        .copied()
+        .or_else(|| transition.from_layout.get(anchor_node_id).copied())
+        .unwrap_or(anchor_from);
+    lerp_point(anchor_from, anchor_to, progress)
+}
+
 fn transition_anchor_frame(
     transition: &NetworkTransition,
     to_layout: &BTreeMap<String, (f64, f64)>,
     progress: f64,
 ) -> (f64, f64) {
-    let anchor_from = transition
-        .from_layout
-        .get(&transition.anchor_node_id)
-        .copied()
-        .or_else(|| to_layout.get(&transition.anchor_node_id).copied())
-        .unwrap_or((0.0, 0.0));
-    let anchor_to = to_layout
-        .get(&transition.anchor_node_id)
-        .copied()
-        .or_else(|| {
-            transition
-                .from_layout
-                .get(&transition.anchor_node_id)
-                .copied()
-        })
-        .unwrap_or(anchor_from);
-    lerp_point(anchor_from, anchor_to, progress)
+    transition_anchor_frame_for_id(transition, to_layout, &transition.anchor_node_id, progress)
 }
 
-fn transition_node_frame(
+pub(in crate::network) fn transition_node_anchor_frame(
+    node_id: &str,
+    transition: &NetworkTransition,
+    to_layout: &BTreeMap<String, (f64, f64)>,
+    current_parent_by_id: &HashMap<&str, &str>,
+    previous_parent_by_id: &HashMap<&str, &str>,
+    current_ids: &HashSet<&str>,
+    previous_ids: &HashSet<&str>,
+    progress: f64,
+) -> (f64, f64) {
+    let from_present = transition.from_layout.contains_key(node_id);
+    let to_present = to_layout.contains_key(node_id);
+
+    if !from_present && to_present {
+        if let Some(anchor_id) = nearest_shared_ancestor(current_parent_by_id, previous_ids, node_id)
+        {
+            return transition_anchor_frame_for_id(transition, to_layout, &anchor_id, progress);
+        }
+    }
+
+    if from_present && !to_present {
+        if let Some(anchor_id) = nearest_shared_ancestor(previous_parent_by_id, current_ids, node_id)
+        {
+            return transition_anchor_frame_for_id(transition, to_layout, &anchor_id, progress);
+        }
+    }
+
+    transition_anchor_frame(transition, to_layout, progress)
+}
+
+pub(in crate::network) fn transition_node_frame(
     node_id: &str,
     transition: &NetworkTransition,
     to_layout: &BTreeMap<String, (f64, f64)>,
@@ -112,18 +146,19 @@ where
     let progress = progress.clamp(0.0, 1.0);
     root.fill(&WHITE).map_err(backend_error)?;
     let viewport = PixelBounds::from_canvas(spec.width, spec.height);
-    let anchor_frame = transition_anchor_frame(transition, layout, progress);
     let current_nodes_by_id = spec
         .nodes
         .iter()
         .map(|node| (node.id.as_str(), node))
         .collect::<HashMap<_, _>>();
+    let current_ids = current_nodes_by_id.keys().copied().collect::<HashSet<_>>();
     let previous_nodes_by_id = transition
         .from_spec
         .nodes
         .iter()
         .map(|node| (node.id.as_str(), node))
         .collect::<HashMap<_, _>>();
+    let previous_ids = previous_nodes_by_id.keys().copied().collect::<HashSet<_>>();
     let current_parent_by_id = structural_parent_map(spec);
     let previous_parent_by_id = structural_parent_map(&transition.from_spec);
 
@@ -147,13 +182,33 @@ where
     }
 
     for ((source_id, target_id), (from_edge, to_edge)) in edge_entries {
+        let source_anchor_frame = transition_node_anchor_frame(
+            &source_id,
+            transition,
+            layout,
+            &current_parent_by_id,
+            &previous_parent_by_id,
+            &current_ids,
+            &previous_ids,
+            progress,
+        );
         let Some(source_state) =
-            transition_node_frame(&source_id, transition, layout, anchor_frame, progress)
+            transition_node_frame(&source_id, transition, layout, source_anchor_frame, progress)
         else {
             continue;
         };
+        let target_anchor_frame = transition_node_anchor_frame(
+            &target_id,
+            transition,
+            layout,
+            &current_parent_by_id,
+            &previous_parent_by_id,
+            &current_ids,
+            &previous_ids,
+            progress,
+        );
         let Some(target_state) =
-            transition_node_frame(&target_id, transition, layout, anchor_frame, progress)
+            transition_node_frame(&target_id, transition, layout, target_anchor_frame, progress)
         else {
             continue;
         };
@@ -273,8 +328,18 @@ where
     }
 
     for node_id in ordered_transition_node_ids(spec, &transition.from_spec) {
+        let node_anchor_frame = transition_node_anchor_frame(
+            &node_id,
+            transition,
+            layout,
+            &current_parent_by_id,
+            &previous_parent_by_id,
+            &current_ids,
+            &previous_ids,
+            progress,
+        );
         let Some(node_state) =
-            transition_node_frame(&node_id, transition, layout, anchor_frame, progress)
+            transition_node_frame(&node_id, transition, layout, node_anchor_frame, progress)
         else {
             continue;
         };
@@ -333,7 +398,17 @@ where
             .copied()
             .or_else(|| previous_parent_by_id.get(node_id.as_str()).copied())
             .and_then(|parent_id| {
-                transition_node_frame(parent_id, transition, layout, anchor_frame, progress)
+                let parent_anchor_frame = transition_node_anchor_frame(
+                    parent_id,
+                    transition,
+                    layout,
+                    &current_parent_by_id,
+                    &previous_parent_by_id,
+                    &current_ids,
+                    &previous_ids,
+                    progress,
+                );
+                transition_node_frame(parent_id, transition, layout, parent_anchor_frame, progress)
                     .map(|state| state.point)
             });
         if let Some(badge) = toggle_badge_for_node_frame(
@@ -362,12 +437,34 @@ pub(in crate::network) fn render_transition_nodes_with_layout(
     progress: f64,
 ) -> Vec<GraphNodeRenderInfo> {
     let progress = progress.clamp(0.0, 1.0);
-    let anchor_frame = transition_anchor_frame(transition, layout, progress);
     let viewport = PixelBounds::from_canvas(spec.width, spec.height);
+    let current_ids = spec
+        .nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .collect::<HashSet<_>>();
+    let previous_ids = transition
+        .from_spec
+        .nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .collect::<HashSet<_>>();
+    let current_parent_by_id = structural_parent_map(spec);
+    let previous_parent_by_id = structural_parent_map(&transition.from_spec);
 
     ordered_transition_node_ids(spec, &transition.from_spec)
         .into_iter()
         .filter_map(|node_id| {
+            let anchor_frame = transition_node_anchor_frame(
+                &node_id,
+                transition,
+                layout,
+                &current_parent_by_id,
+                &previous_parent_by_id,
+                &current_ids,
+                &previous_ids,
+                progress,
+            );
             let node_state =
                 transition_node_frame(&node_id, transition, layout, anchor_frame, progress)?;
             if node_state.opacity <= 0.0 {

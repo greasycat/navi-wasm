@@ -28,6 +28,7 @@ fn network_non_circle_shapes_render_without_error() {
                 label_inside: Some(true),
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             }],
             edges: vec![],

@@ -262,6 +262,17 @@ pub(crate) fn pan_network(spec: JsValue, delta_x: f64, delta_y: f64) -> Result<J
     to_js_value(&next)
 }
 
+pub(crate) fn create_network_subgraph(
+    spec: JsValue,
+    included_node_ids: JsValue,
+) -> Result<JsValue, JsValue> {
+    let spec: NetworkPlotSpec = from_value(spec).map_err(js_error)?;
+    let included_node_ids: Vec<String> = from_value(included_node_ids).map_err(js_error)?;
+    let next = navi_plot_core::create_network_subgraph(&spec, included_node_ids)
+        .map_err(plot_error_to_js)?;
+    to_js_value(&next)
+}
+
 pub(crate) fn pick_network_node(
     spec: JsValue,
     canvas_x: f64,

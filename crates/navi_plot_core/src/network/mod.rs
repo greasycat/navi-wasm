@@ -28,6 +28,57 @@ pub use self::render::{
 };
 pub use self::session::NetworkSession;
 
+pub fn create_network_subgraph(
+    spec: &NetworkPlotSpec,
+    included_node_ids: Vec<String>,
+) -> Result<NetworkPlotSpec, PlotError> {
+    if included_node_ids.is_empty() {
+        return Err(PlotError::EmptyNetwork);
+    }
+
+    let known_ids = spec
+        .nodes
+        .iter()
+        .map(|node| node.id.as_str())
+        .collect::<HashSet<_>>();
+    let included = included_node_ids
+        .into_iter()
+        .collect::<BTreeSet<_>>();
+
+    for node_id in &included {
+        if !known_ids.contains(node_id.as_str()) {
+            return Err(PlotError::UnknownNode {
+                node_id: node_id.clone(),
+            });
+        }
+    }
+
+    let nodes = spec
+        .nodes
+        .iter()
+        .filter(|node| included.contains(&node.id))
+        .cloned()
+        .collect::<Vec<_>>();
+    if nodes.is_empty() {
+        return Err(PlotError::EmptyNetwork);
+    }
+
+    let edges = spec
+        .edges
+        .iter()
+        .filter(|edge| included.contains(&edge.source) && included.contains(&edge.target))
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut next = spec.clone();
+    next.nodes = nodes;
+    next.edges = edges;
+    next.selected_node_id = next
+        .selected_node_id
+        .filter(|node_id| included.contains(node_id));
+    Ok(next)
+}
+
 const DEFAULT_NODE_COLOR: RGBColor = RGBColor(59, 130, 246);
 const DEFAULT_EDGE_COLOR: RGBColor = RGBColor(107, 114, 128);
 const SELECTION_RING_PADDING: i32 = 5;

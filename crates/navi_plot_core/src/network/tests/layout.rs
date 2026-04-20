@@ -11,6 +11,61 @@ fn network_layout_positions_are_finite() {
 }
 
 #[test]
+fn network_relaxation_only_uses_nodes_in_the_same_force_layer() {
+    let spec = NetworkPlotSpec {
+        nodes: vec![
+            NetworkNode {
+                id: "left".to_string(),
+                label: "Left".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: Some(vec![1]),
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "right".to_string(),
+                label: "Right".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: Some(vec![2]),
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "center".to_string(),
+                label: "Center".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: Some(vec![1]),
+                properties: Default::default(),
+            },
+        ],
+        edges: vec![],
+        ..sample_spec()
+    };
+    let mut positions = vec![(-WORLD_NODE_SPACING, 0.0), (WORLD_NODE_SPACING, 0.0), (0.0, 0.0)];
+    let movable = vec![false, false, true];
+
+    relax_positions(&spec, &mut positions, &movable, 8);
+
+    assert!(positions[2].0 > 0.0, "center node should only be repelled by the left node");
+}
+
+#[test]
 fn network_seed_position_prefers_open_parent_gap() {
     let spec = NetworkPlotSpec {
         nodes: vec![
@@ -24,6 +79,7 @@ fn network_seed_position_prefers_open_parent_gap() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -36,6 +92,7 @@ fn network_seed_position_prefers_open_parent_gap() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -48,6 +105,7 @@ fn network_seed_position_prefers_open_parent_gap() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -60,6 +118,7 @@ fn network_seed_position_prefers_open_parent_gap() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -117,6 +176,7 @@ fn network_structural_helpers_ignore_lightweight_sibling_edges() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -129,6 +189,7 @@ fn network_structural_helpers_ignore_lightweight_sibling_edges() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -141,6 +202,7 @@ fn network_structural_helpers_ignore_lightweight_sibling_edges() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -225,6 +287,7 @@ fn network_mixed_layout_pins_supplied_nodes_and_places_free_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -237,6 +300,7 @@ fn network_mixed_layout_pins_supplied_nodes_and_places_free_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -249,6 +313,7 @@ fn network_mixed_layout_pins_supplied_nodes_and_places_free_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -288,6 +353,7 @@ fn network_layout_separates_long_sibling_labels() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -300,6 +366,7 @@ fn network_layout_separates_long_sibling_labels() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -312,6 +379,7 @@ fn network_layout_separates_long_sibling_labels() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -324,6 +392,7 @@ fn network_layout_separates_long_sibling_labels() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -377,6 +446,7 @@ fn network_layout_spreads_root_siblings_radially() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -389,6 +459,7 @@ fn network_layout_spreads_root_siblings_radially() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -401,6 +472,7 @@ fn network_layout_spreads_root_siblings_radially() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -413,6 +485,7 @@ fn network_layout_spreads_root_siblings_radially() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -489,6 +562,7 @@ fn network_layout_spreads_nested_siblings_around_parent() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -501,6 +575,7 @@ fn network_layout_spreads_nested_siblings_around_parent() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -513,6 +588,7 @@ fn network_layout_spreads_nested_siblings_around_parent() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -525,6 +601,7 @@ fn network_layout_spreads_nested_siblings_around_parent() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -537,6 +614,7 @@ fn network_layout_spreads_nested_siblings_around_parent() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -633,6 +711,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -645,6 +724,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -657,6 +737,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -669,6 +750,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -681,6 +763,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -693,6 +776,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -705,6 +789,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -717,6 +802,7 @@ fn network_layout_pushes_crowded_sibling_groups_farther_out_than_sparse_ones() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],

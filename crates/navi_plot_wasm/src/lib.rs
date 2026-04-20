@@ -372,6 +372,10 @@ result_exports! {
         canvas_id: &str,
         spec: wasm_bindgen::JsValue,
     ) -> Result<(), wasm_bindgen::JsValue>;
+    fn create_network_subgraph(
+        spec: wasm_bindgen::JsValue,
+        included_node_ids: wasm_bindgen::JsValue,
+    ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
     fn pan_network(
         spec: wasm_bindgen::JsValue,
         delta_x: f64,

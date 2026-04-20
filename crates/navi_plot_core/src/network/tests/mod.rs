@@ -31,6 +31,7 @@ fn sample_spec() -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -43,6 +44,7 @@ fn sample_spec() -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -55,6 +57,7 @@ fn sample_spec() -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -107,6 +110,7 @@ fn positioned_spec() -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -119,6 +123,7 @@ fn positioned_spec() -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
@@ -147,6 +152,7 @@ fn toggleable_positioned_spec(expanded: bool) -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -159,6 +165,7 @@ fn toggleable_positioned_spec(expanded: bool) -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: BTreeMap::from([
                     (TOGGLEABLE_PROPERTY_KEY.to_string(), "true".to_string()),
                     (
@@ -177,6 +184,7 @@ fn toggleable_positioned_spec(expanded: bool) -> NetworkPlotSpec {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],

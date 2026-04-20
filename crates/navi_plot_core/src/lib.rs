@@ -81,6 +81,8 @@ pub use heatmap::HeatmapSession;
 
 /// Return a view that fits the target node and its local neighborhood.
 pub use network::focus_network_view;
+/// Return a derived network spec containing only the requested nodes and induced edges.
+pub use network::create_network_subgraph;
 /// Return resolved network node positions and media metadata for frontend overlays.
 pub use network::network_render_nodes;
 /// Return the updated spec with `offset_x`/`offset_y` shifted by the given pixel delta.

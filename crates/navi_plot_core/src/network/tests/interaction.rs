@@ -138,6 +138,7 @@ fn network_focus_view_fits_node_and_neighbors() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -150,6 +151,7 @@ fn network_focus_view_fits_node_and_neighbors() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
             NetworkNode {
@@ -162,6 +164,7 @@ fn network_focus_view_fits_node_and_neighbors() {
                 label_inside: None,
                 style: None,
                 media: None,
+                force_layers: None,
                 properties: Default::default(),
             },
         ],
