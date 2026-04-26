@@ -100,8 +100,8 @@ pub use network::{NetworkPickHit, NetworkPickKind};
 pub use node::{GraphNodeRenderInfo, ResolvedNodeMedia, ResolvedNodeMediaKind};
 pub use types::{
     BarChartSpec, BarSeries, BarVariant, BuiltinNodeIcon, HeatmapSpec, LinePlotSpec, LinePoint,
-    LineSeries, NetworkEdge, NetworkFocusMode, NetworkFocusOptions, NetworkNode, NetworkPlotSpec,
-    NetworkView, NodeMedia, NodeMediaFit, NodeMediaKind,
+    LineSeries, NetworkEdge, NetworkFocusMode, NetworkFocusOptions, NetworkLayoutPoint,
+    NetworkNode, NetworkPlotSpec, NetworkView, NodeMedia, NodeMediaFit, NodeMediaKind,
 };
 pub use types::{
     GraphEdgeStyle, GraphNodeStyle, NodeShape, ScatterPlotSpec, ScatterPoint, SelectionStyle,

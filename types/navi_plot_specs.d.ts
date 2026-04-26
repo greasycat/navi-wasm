@@ -362,6 +362,11 @@ export interface NetworkView {
   translate_y: number;
 }
 
+export interface NetworkLayoutPoint {
+  x: number;
+  y: number;
+}
+
 export type NetworkFocusMode = "node_and_neighbors";
 
 export interface NetworkFocusOptions {

@@ -1,8 +1,9 @@
 use super::*;
 use crate::node::ResolvedNodeMediaKind;
 use crate::types::{
-    BuiltinNodeIcon, GraphEdgeStyle, GraphNodeStyle, NetworkEdge, NetworkNode, NetworkPlotSpec,
-    NetworkView, NodeMedia, NodeMediaFit, NodeMediaKind, NodeShape, SelectionStyle,
+    BuiltinNodeIcon, GraphEdgeStyle, GraphNodeStyle, NetworkEdge, NetworkLayoutPoint,
+    NetworkNode, NetworkPlotSpec, NetworkView, NodeMedia, NodeMediaFit, NodeMediaKind, NodeShape,
+    SelectionStyle,
 };
 use plotters::drawing::IntoDrawingArea;
 use plotters_svg::SVGBackend;

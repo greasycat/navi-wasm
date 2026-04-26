@@ -78,6 +78,31 @@ pub(crate) fn update_network_session(handle: u32, spec: JsValue) -> Result<(), J
     })
 }
 
+pub(crate) fn update_network_session_with_layout_cache(
+    handle: u32,
+    spec: JsValue,
+    layout_cache: JsValue,
+) -> Result<(), JsValue> {
+    let spec: NetworkPlotSpec = from_value(spec).map_err(js_error)?;
+    let layout_cache: Option<BTreeMap<String, NetworkLayoutPoint>> =
+        if layout_cache.is_null() || layout_cache.is_undefined() {
+            None
+        } else {
+            Some(from_value(layout_cache).map_err(js_error)?)
+        };
+    with_network_session_mut(handle, |entry| {
+        let spec = normalize_network_spec_for_canvas(&entry.canvas_id, spec)?;
+        entry
+            .session
+            .update_spec_with_layout(spec, layout_cache)
+            .map_err(plot_error_to_js)
+    })
+}
+
+pub(crate) fn get_network_layout_session(handle: u32) -> Result<JsValue, JsValue> {
+    with_network_session_mut(handle, |entry| to_js_value(&entry.session.layout_snapshot()))
+}
+
 pub(crate) fn render_network_session(handle: u32) -> Result<(), JsValue> {
     with_network_session_mut(handle, |entry| {
         let root = drawing_area(

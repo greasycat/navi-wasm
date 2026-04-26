@@ -584,6 +584,13 @@ pub struct NetworkView {
     pub translate_y: f64,
 }
 
+/// Computed world-space position of a network node.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+pub struct NetworkLayoutPoint {
+    pub x: f64,
+    pub y: f64,
+}
+
 /// Focus behavior for computing a target camera view.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct NetworkFocusOptions {

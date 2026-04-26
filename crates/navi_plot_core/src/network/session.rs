@@ -31,6 +31,14 @@ impl NetworkSession {
     }
 
     pub fn update_spec(&mut self, spec: NetworkPlotSpec) -> Result<(), PlotError> {
+        self.update_spec_with_layout(spec, None)
+    }
+
+    pub fn update_spec_with_layout(
+        &mut self,
+        spec: NetworkPlotSpec,
+        cached_layout: Option<BTreeMap<String, NetworkLayoutPoint>>,
+    ) -> Result<(), PlotError> {
         validate(&spec)?;
         let topology_changed = topology_changed(&self.spec, &spec);
         let previous_spec = self.spec.clone();
@@ -38,12 +46,15 @@ impl NetworkSession {
         let previous_resolved = self.resolved.clone();
         let previous_selected_node_id = self.spec.selected_node_id.clone();
         let resolved = resolve_nodes(&spec)?;
-        let layout = compute_layout_from_previous_with_zoom(
-            &self.layout,
-            &self.spec,
-            &spec,
-            self.view.zoom,
-        )?;
+        let layout = match cached_layout.and_then(|layout| resolved_cached_layout(&spec, layout)) {
+            Some(layout) => layout,
+            None => compute_layout_from_previous_with_zoom(
+                &self.layout,
+                &self.spec,
+                &spec,
+                self.view.zoom,
+            )?,
+        };
         let selection_style =
             resolve_selection_style(SELECTION_RING_PADDING, spec.selection_style.as_ref())?;
         let view = self.view;
@@ -300,8 +311,34 @@ impl NetworkSession {
         self.transition = None;
     }
 
+    pub fn layout_snapshot(&self) -> BTreeMap<String, NetworkLayoutPoint> {
+        self.layout
+            .iter()
+            .map(|(id, &(x, y))| (id.clone(), NetworkLayoutPoint { x, y }))
+            .collect()
+    }
+
     fn sync_view_to_spec(&mut self) {
         self.spec.offset_x = self.view.translate_x.round() as i32;
         self.spec.offset_y = self.view.translate_y.round() as i32;
     }
+}
+
+fn resolved_cached_layout(
+    spec: &NetworkPlotSpec,
+    cached_layout: BTreeMap<String, NetworkLayoutPoint>,
+) -> Option<BTreeMap<String, (f64, f64)>> {
+    if cached_layout.len() != spec.nodes.len() {
+        return None;
+    }
+
+    let mut layout = BTreeMap::new();
+    for node in &spec.nodes {
+        let point = cached_layout.get(&node.id)?;
+        if !point.x.is_finite() || !point.y.is_finite() {
+            return None;
+        }
+        layout.insert(node.id.clone(), (point.x, point.y));
+    }
+    Some(layout)
 }

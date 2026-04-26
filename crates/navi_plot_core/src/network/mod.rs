@@ -6,7 +6,9 @@ use crate::graph_style::{
     EdgeStyleContext, NodeStyleContext, ResolvedNodeStyle, ResolvedSelectionStyle,
 };
 use crate::node::{self, GraphNodeRenderInfo, ResolvedNodeMedia};
-use crate::types::{NetworkFocusMode, NetworkFocusOptions, NetworkPlotSpec, NetworkView};
+use crate::types::{
+    NetworkFocusMode, NetworkFocusOptions, NetworkLayoutPoint, NetworkPlotSpec, NetworkView,
+};
 use crate::viewport::{ensure_finite, PixelBounds, ScreenTransform};
 use crate::{backend_error, ensure_dimensions, PlotArea, PlotError};
 use plotters::prelude::*;

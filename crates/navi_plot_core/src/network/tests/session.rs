@@ -45,6 +45,91 @@ fn network_session_update_preserves_existing_positions() {
 }
 
 #[test]
+fn network_session_exposes_layout_snapshot() {
+    let session = NetworkSession::new(positioned_spec()).unwrap();
+    let snapshot = session.layout_snapshot();
+
+    assert_eq!(snapshot.len(), session.layout.len());
+    assert_eq!(snapshot["a"].x, session.layout["a"].0);
+    assert_eq!(snapshot["a"].y, session.layout["a"].1);
+}
+
+#[test]
+fn network_session_update_can_restore_cached_target_layout() {
+    let spec = positioned_spec();
+    let mut session = NetworkSession::new(spec.clone()).unwrap();
+    let target = NetworkPlotSpec {
+        nodes: vec![
+            spec.nodes[0].clone(),
+            spec.nodes[1].clone(),
+            NetworkNode {
+                id: "c".to_string(),
+                label: "C".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: None,
+                properties: Default::default(),
+            },
+        ],
+        edges: vec![
+            spec.edges[0].clone(),
+            NetworkEdge {
+                source: "b".to_string(),
+                target: "c".to_string(),
+                label: None,
+                color: None,
+                weight: None,
+                style: None,
+            },
+        ],
+        ..spec
+    };
+    let cached = BTreeMap::from([
+        ("a".to_string(), NetworkLayoutPoint { x: 10.0, y: 20.0 }),
+        ("b".to_string(), NetworkLayoutPoint { x: 30.0, y: 40.0 }),
+        ("c".to_string(), NetworkLayoutPoint { x: 50.0, y: 60.0 }),
+    ]);
+
+    session
+        .update_spec_with_layout(target, Some(cached.clone()))
+        .unwrap();
+
+    assert!(session.has_transition());
+    assert_eq!(session.layout["a"], (cached["a"].x, cached["a"].y));
+    assert_eq!(session.layout["b"], (cached["b"].x, cached["b"].y));
+    assert_eq!(session.layout["c"], (cached["c"].x, cached["c"].y));
+}
+
+#[test]
+fn network_session_ignores_cached_layout_with_changed_nodes() {
+    let spec = positioned_spec();
+    let mut session = NetworkSession::new(spec.clone()).unwrap();
+    let target = NetworkPlotSpec {
+        nodes: vec![spec.nodes[0].clone(), spec.nodes[1].clone()],
+        edges: vec![spec.edges[0].clone()],
+        ..spec
+    };
+    let stale_cached = BTreeMap::from([
+        ("a".to_string(), NetworkLayoutPoint { x: 10.0, y: 20.0 }),
+        ("extra".to_string(), NetworkLayoutPoint { x: 30.0, y: 40.0 }),
+    ]);
+
+    session
+        .update_spec_with_layout(target, Some(stale_cached))
+        .unwrap();
+
+    assert!(session.layout.contains_key("a"));
+    assert!(session.layout.contains_key("b"));
+    assert_eq!(session.layout.len(), 2);
+    assert_ne!(session.layout["a"], (10.0, 20.0));
+}
+
+#[test]
 fn network_selection_only_update_does_not_create_transition() {
     let spec = positioned_spec();
     let mut session = NetworkSession::new(spec.clone()).unwrap();

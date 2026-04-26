@@ -7,9 +7,9 @@ use navi_plot_core::{
     pick_tree_node as core_pick_tree_node, render_bar_on, render_heatmap_on, render_line_on,
     render_network_on, render_scatter_on, render_tree_on, tree_render_nodes, BarChartSpec,
     BarSession, GraphNodeRenderInfo, HeatmapSession, HeatmapSpec, LinePlotSpec, LineSession,
-    NetworkFocusOptions, NetworkPickHit, NetworkPickKind, NetworkPlotSpec, NetworkSession,
-    NetworkView, NodeMediaFit, NodeShape, PlotError, ResolvedNodeMediaKind, ScatterPlotSpec,
-    ScatterSession, TreePlotSpec, TreeSession,
+    NetworkFocusOptions, NetworkLayoutPoint, NetworkPickHit, NetworkPickKind, NetworkPlotSpec,
+    NetworkSession, NetworkView, NodeMediaFit, NodeShape, PlotError, ResolvedNodeMediaKind,
+    ScatterPlotSpec, ScatterSession, TreePlotSpec, TreeSession,
 };
 use plotters::coord::Shift;
 use plotters::prelude::IntoDrawingArea;

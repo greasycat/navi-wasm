@@ -304,6 +304,14 @@ result_exports! {
         handle: u32,
         spec: wasm_bindgen::JsValue,
     ) -> Result<(), wasm_bindgen::JsValue>;
+    fn update_network_session_with_layout_cache(
+        handle: u32,
+        spec: wasm_bindgen::JsValue,
+        layout_cache: wasm_bindgen::JsValue,
+    ) -> Result<(), wasm_bindgen::JsValue>;
+    fn get_network_layout_session(
+        handle: u32,
+    ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
     fn render_network_session(handle: u32) -> Result<(), wasm_bindgen::JsValue>;
     fn render_network_transition_session(
         handle: u32,
