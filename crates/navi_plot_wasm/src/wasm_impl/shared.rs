@@ -312,6 +312,8 @@ thread_local! {
         RefCell::new(BarSessionStore::default());
     pub(crate) static HEATMAP_SESSIONS: RefCell<HeatmapSessionStore> =
         RefCell::new(HeatmapSessionStore::default());
+    pub(crate) static CANVAS_HIDPI_PLANS: RefCell<BTreeMap<String, crate::hidpi::CanvasHiDpiPlan>> =
+        RefCell::new(BTreeMap::new());
     pub(crate) static GRAPH_IMAGES: RefCell<BTreeMap<String, HtmlImageElement>> =
         RefCell::new(BTreeMap::new());
 }
@@ -460,6 +462,9 @@ pub(crate) fn drawing_area(
 ) -> Result<plotters::drawing::DrawingArea<HiDpiCanvasBackend, Shift>, JsValue> {
     let canvas = canvas_by_id(canvas_id)?;
     let plan = canvas_hidpi_plan(&canvas, width, height)?;
+    CANVAS_HIDPI_PLANS.with(|plans| {
+        plans.borrow_mut().insert(canvas_id.to_owned(), plan);
+    });
     if canvas.width() != plan.backing_width {
         canvas.set_width(plan.backing_width);
     }
@@ -624,22 +629,25 @@ pub(crate) fn draw_graph_image(
     let y = f64::from(node.center_y) - draw_height / 2.0;
 
     context.save();
-    clip_node_shape(
-        context,
-        &node.shape,
-        f64::from(node.center_x),
-        f64::from(node.center_y),
-        f64::from(node.radius.max(1)),
-    )?;
-    context.draw_image_with_html_image_element_and_dw_and_dh(
-        image,
-        x,
-        y,
-        draw_width,
-        draw_height,
-    )?;
+    let result = (|| {
+        clip_node_shape(
+            context,
+            &node.shape,
+            f64::from(node.center_x),
+            f64::from(node.center_y),
+            f64::from(node.radius.max(1)),
+        )?;
+        context.draw_image_with_html_image_element_and_dw_and_dh(
+            image,
+            x,
+            y,
+            draw_width,
+            draw_height,
+        )?;
+        Ok(())
+    })();
     context.restore();
-    Ok(())
+    result
 }
 
 pub(crate) fn overlay_graph_images(
@@ -647,25 +655,36 @@ pub(crate) fn overlay_graph_images(
     nodes: &[GraphNodeRenderInfo],
 ) -> Result<(), JsValue> {
     let context = canvas_2d_context(canvas_id)?;
+    let plan = CANVAS_HIDPI_PLANS.with(|plans| plans.borrow().get(canvas_id).copied());
+    let transform_scale = plan
+        .filter(|plan| matches!(plan.mode, CanvasHiDpiMode::Logical))
+        .map(|plan| plan.transform_scale)
+        .unwrap_or(1.0);
 
-    for node in nodes {
-        let Some(media) = node.media.as_ref() else {
-            continue;
-        };
-        let ResolvedNodeMediaKind::Image { image_key, fit, .. } = &media.kind else {
-            continue;
-        };
-        let image = GRAPH_IMAGES.with(|images| images.borrow().get(image_key).cloned());
-        let Some(image) = image else {
-            continue;
-        };
-        context.save();
-        context.set_global_alpha(node.opacity.clamp(0.0, 1.0));
-        draw_graph_image(&context, &image, node, fit, media.scale)?;
-        context.restore();
-    }
-
-    Ok(())
+    context.save();
+    let result = (|| {
+        context.set_transform(transform_scale, 0.0, 0.0, transform_scale, 0.0, 0.0)?;
+        for node in nodes {
+            let Some(media) = node.media.as_ref() else {
+                continue;
+            };
+            let ResolvedNodeMediaKind::Image { image_key, fit, .. } = &media.kind else {
+                continue;
+            };
+            let image = GRAPH_IMAGES.with(|images| images.borrow().get(image_key).cloned());
+            let Some(image) = image else {
+                continue;
+            };
+            context.save();
+            context.set_global_alpha(node.opacity.clamp(0.0, 1.0));
+            let draw_result = draw_graph_image(&context, &image, node, fit, media.scale);
+            context.restore();
+            draw_result?;
+        }
+        Ok(())
+    })();
+    context.restore();
+    result
 }
 
 pub(crate) fn with_scatter_session_mut<T>(
