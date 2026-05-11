@@ -30,6 +30,23 @@ const BREATHE_RADIUS_SCALE_RANGE = 0.34;
 const BREATHE_PULSE_SCALE = 0.5;
 const BREATHE_BRANCH_ROTATION_SPEED_SCALE = 0.016;
 const USER_ROTATION_MIN_RADIUS = 90;
+const TRACKING_EDGE_DURATION_MS = 600;
+const TRACKING_MAX_DURATION_MS = 12000;
+const TRACKING_DASH_CYCLE_MS = 1400;
+const TRACKING_DASH_PATTERN = [14, 10];
+const TRACKING_DASH_PERIOD = TRACKING_DASH_PATTERN.reduce((sum, value) => sum + value, 0);
+const TRACKING_FALLBACK_STROKE = "rgba(239, 68, 68, 0.95)";
+const TRACKING_DASH_WIDTH = 4;
+const PLAYBACK_IMPORTANCE_THRESHOLD = 0.5;
+const SELECTED_ARC_CYCLE_MS = 2429;
+const SELECTED_RECT_CYCLE_MS = 3400;
+const SELECTED_ARC_COUNT = 3;
+const SELECTED_ARC_STEP = TAU / SELECTED_ARC_COUNT;
+const SELECTED_ARC_SPAN = SELECTED_ARC_STEP * 0.52;
+const SELECTED_RECT_EDGE_COUNT = 4;
+const SELECTED_RECT_SEGMENT_RATIO = 0.52;
+const SELECTED_ARC_BASE_OPACITY = 0.16;
+const SELECTED_ARC_OPACITY = 0.94;
 const MOTION_MODES = new Set(["orbital", "drift", "breathe"]);
 
 const LEVEL_COLORS = ["#1d7a42", "#0891b2", "#7c3aed", "#d97706", "#dc2626"];
@@ -85,6 +102,7 @@ const ROLE_COLORS = {
   claim: "#4f46e5",
   caption: "#64748b"
 };
+const IRRELEVANT_NODE_COLOR = "#9ca3af";
 
 const state = {
   data: null,
@@ -108,6 +126,16 @@ const state = {
   motionTimeSeconds: 0,
   motionLastFrameMs: null,
   motionParams: new Map(),
+  userTransformActive: false,
+  pathPlaybackFrame: null,
+  pathPlaybackActive: false,
+  pathPlaybackNodeIds: null,
+  pathPlaybackProgress: 0,
+  pathPlaybackCompleted: false,
+  pathPlaybackDashPhase: 0,
+  pathPlaybackRouteSegments: null,
+  pathPlaybackOverlaySegments: null,
+  selectionFrame: null,
   pixelRatio: Math.max(1, Math.min(3, Math.round((window.devicePixelRatio || 1) * 2) / 2)),
   resizeFrame: null
 };
@@ -118,6 +146,7 @@ const dom = {
   tocList: document.getElementById("toc-list"),
   visibleCount: document.getElementById("visible-count"),
   canvas: document.getElementById("network-canvas"),
+  overlayCanvas: document.getElementById("network-overlay-canvas"),
   frame: document.querySelector(".canvas-frame"),
   details: document.getElementById("node-details"),
   reset: document.getElementById("reset-view"),
@@ -130,6 +159,8 @@ const dom = {
   loadNavilAnchorStrongSubgraph: document.getElementById("load-navil-anchor-strong-subgraph"),
   loadNavilDemoParamsSubgraph: document.getElementById("load-navil-demo-params-subgraph"),
   wholeGraph: document.getElementById("whole-graph"),
+  playPath: document.getElementById("play-path"),
+  clearPath: document.getElementById("clear-path"),
   motionToggle: document.getElementById("motion-toggle"),
   motionModeButtons: Array.from(document.querySelectorAll("[data-motion-mode]")),
   metricVisible: document.getElementById("metric-visible"),
@@ -189,8 +220,48 @@ function stageColor(orderIndex) {
   return stage ? STAGE_COLORS[stage.stageIndex % STAGE_COLORS.length] : null;
 }
 
-function nodeColor(entry) {
+function isIrrelevantEntry(entry) {
+  return normalizedRelevance(entry) <= 0;
+}
+
+function nodeBaseColor(entry) {
+  if (isIrrelevantEntry(entry)) return IRRELEVANT_NODE_COLOR;
   return stageColor(entry.order_index) ?? levelColor(entry);
+}
+
+function nodeColor(entry, parentColor = null) {
+  if (parentColor) {
+    return mixHexColors(IRRELEVANT_NODE_COLOR, parentColor, normalizedRelevance(entry));
+  }
+  return nodeBaseColor(entry);
+}
+
+function buildEntryColorMap(entries) {
+  const entryByOrder = new Map(entries.map((entry) => [entry.order_index, entry]));
+  const colorByOrder = new Map();
+  const resolving = new Set();
+
+  const resolveColor = (entry) => {
+    if (!entry) return null;
+    const cached = colorByOrder.get(entry.order_index);
+    if (cached) return cached;
+    if (resolving.has(entry.order_index)) {
+      return nodeBaseColor(entry);
+    }
+    resolving.add(entry.order_index);
+    const parent = entry.parent_order_index == null ? null : entryByOrder.get(entry.parent_order_index);
+    const parentColor = parent ? resolveColor(parent) : null;
+    const color = nodeColor(entry, parentColor);
+    resolving.delete(entry.order_index);
+    colorByOrder.set(entry.order_index, color);
+    return color;
+  };
+
+  for (const entry of entries) {
+    resolveColor(entry);
+  }
+
+  return colorByOrder;
 }
 
 function componentColor(component) {
@@ -267,6 +338,36 @@ function cssColor(color, opacity = 1) {
   const blue = Number.parseInt(expanded.slice(4, 6), 16);
   if (![red, green, blue].every(Number.isFinite)) return value;
   return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function parseHexColor(color) {
+  if (!color || typeof color !== "string") return null;
+  const value = color.trim();
+  if (!value.startsWith("#")) return null;
+  const hex = value.slice(1);
+  const expanded = hex.length === 3
+    ? hex.split("").map((char) => `${char}${char}`).join("")
+    : hex;
+  if (expanded.length !== 6) return null;
+  const red = Number.parseInt(expanded.slice(0, 2), 16);
+  const green = Number.parseInt(expanded.slice(2, 4), 16);
+  const blue = Number.parseInt(expanded.slice(4, 6), 16);
+  if (![red, green, blue].every(Number.isFinite)) return null;
+  return { red, green, blue };
+}
+
+function channelToHex(value) {
+  return Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0");
+}
+
+function mixHexColors(fromColor, toColor, amount) {
+  const from = parseHexColor(fromColor);
+  const to = parseHexColor(toColor);
+  if (!from || !to) return amount >= 0.5 ? toColor : fromColor;
+  const weight = clamp01(amount);
+  return `#${channelToHex(from.red + (to.red - from.red) * weight)}${channelToHex(
+    from.green + (to.green - from.green) * weight
+  )}${channelToHex(from.blue + (to.blue - from.blue) * weight)}`;
 }
 
 function finiteNumber(value, fallback) {
@@ -591,10 +692,8 @@ function drawCanvasToggleBadge(ctx, spec, node, frame, parentFrame) {
   ctx.restore();
 }
 
-function drawCanvasMotionFrame(spec, layout, view, timeSeconds) {
-  if (!spec || !layout || !view || !hasRadialHierarchy(spec)) return false;
-  const ctx = dom.canvas.getContext("2d");
-  if (!ctx) return false;
+function canvasMotionFrameData(spec, layout, view, timeSeconds) {
+  if (!spec || !layout || !view || !hasRadialHierarchy(spec)) return null;
   const motion = spec.motion;
   const selectionStyle = scaleSelectionStyleForCanvas(resolveSelectionStyleForCanvas(spec), view.zoom);
   const parentById = structuralParentMap(spec);
@@ -632,6 +731,16 @@ function drawCanvasMotionFrame(spec, layout, view, timeSeconds) {
       y: worldY * view.zoom + view.translate_y
     });
   }
+
+  return { frames, parentById, selectionStyle };
+}
+
+function drawCanvasMotionFrame(spec, layout, view, timeSeconds) {
+  const frameData = canvasMotionFrameData(spec, layout, view, timeSeconds);
+  if (!frameData) return false;
+  const ctx = dom.canvas.getContext("2d");
+  if (!ctx) return false;
+  const { frames, parentById, selectionStyle } = frameData;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1022,6 +1131,33 @@ function installDebugApi() {
       if (state.sessionHandle == null || typeof wasm.get_network_layout_session !== "function") return null;
       return wasm.get_network_layout_session(state.sessionHandle);
     },
+    getPlaybackTargets() {
+      return buildPlaybackTargetIds();
+    },
+    getPlaybackRoute() {
+      return buildPlaybackRoute();
+    },
+    startPathPlayback,
+    clearPathPlayback,
+    getPlaybackOverlaySegments() {
+      return pathPlaybackOverlaySegments();
+    },
+    getPlaybackRouteOverlaySegments() {
+      return pathPlaybackRouteOverlaySegments();
+    },
+    getSelectedOverlayFrame() {
+      const frame = selectedNodeOverlayFrame();
+      if (!frame) return null;
+      return {
+        id: state.selectedNodeId,
+        x: frame.x,
+        y: frame.y,
+        radius: frame.style.radius,
+        shape: frame.style.shape,
+        color: frame.style.fillColor ?? frame.node.color ?? null,
+        animating: state.selectionFrame != null || state.motionFrame != null || state.pathPlaybackFrame != null
+      };
+    },
     getStats() {
       const spec = buildSpec();
       const layout = this.getLayout();
@@ -1041,11 +1177,19 @@ function syncCanvasSize() {
   const cssHeight = Math.max(360, Math.round(rect.height));
   const width = Math.round(cssWidth * state.pixelRatio);
   const height = Math.round(cssHeight * state.pixelRatio);
-  if (dom.canvas.width === width && dom.canvas.height === height) {
+  if (
+    dom.canvas.width === width &&
+    dom.canvas.height === height &&
+    dom.overlayCanvas.width === width &&
+    dom.overlayCanvas.height === height
+  ) {
     return false;
   }
   dom.canvas.width = width;
   dom.canvas.height = height;
+  dom.overlayCanvas.width = width;
+  dom.overlayCanvas.height = height;
+  invalidatePathPlaybackOverlay();
   return true;
 }
 
@@ -1061,6 +1205,7 @@ function refreshCurrentLayout() {
   state.currentLayout = state.sessionHandle != null && typeof wasm.get_network_layout_session === "function"
     ? wasm.get_network_layout_session(state.sessionHandle)
     : null;
+  invalidatePathPlaybackOverlay();
   return state.currentLayout;
 }
 
@@ -1120,6 +1265,574 @@ function rotationDeltaFromPointerDrag(anchorPoint, previousPoint, nextPoint) {
   return Number.isFinite(deltaAngle) ? deltaAngle : 0;
 }
 
+function playbackImportance(entry) {
+  const ranked = state.rankByOrder.get(entry.order_index);
+  const rankedImportance = Number(ranked?.importance);
+  if (Number.isFinite(rankedImportance)) return rankedImportance;
+  return normalizedRelevance(entry);
+}
+
+function buildVisiblePathContext() {
+  const rows = visibleEntries();
+  const visibleEntriesList = rows.map((row) => row.entry);
+  const visibleOrderSet = new Set(visibleEntriesList.map((entry) => entry.order_index));
+  const visibleNodeIds = new Set(visibleEntriesList.map((entry) => nodeId(entry.order_index)));
+  visibleNodeIds.add(ROOT_NODE_ID);
+  const parentById = new Map();
+  const childrenByParentId = new Map();
+
+  for (const entry of visibleEntriesList) {
+    const id = nodeId(entry.order_index);
+    const parentId =
+      entry.parent_order_index == null || !visibleOrderSet.has(entry.parent_order_index)
+        ? ROOT_NODE_ID
+        : nodeId(entry.parent_order_index);
+    parentById.set(id, parentId);
+    const bucket = childrenByParentId.get(parentId) ?? [];
+    bucket.push(id);
+    childrenByParentId.set(parentId, bucket);
+  }
+
+  for (const children of childrenByParentId.values()) {
+    children.sort((a, b) => {
+      const aOrder = orderIndexFromNodeId(a) ?? 0;
+      const bOrder = orderIndexFromNodeId(b) ?? 0;
+      return aOrder - bOrder;
+    });
+  }
+
+  return { parentById, childrenByParentId, visibleNodeIds, visibleOrderSet };
+}
+
+function ancestorChainForPath(nodeIdValue, parentById) {
+  const chain = [];
+  let current = nodeIdValue;
+  const seen = new Set();
+  while (current && !seen.has(current)) {
+    chain.push(current);
+    seen.add(current);
+    current = parentById.get(current);
+  }
+  if (chain.at(-1) !== ROOT_NODE_ID) {
+    chain.push(ROOT_NODE_ID);
+  }
+  return chain;
+}
+
+function treePathBetween(fromId, toId, parentById) {
+  if (fromId === toId) return [fromId];
+  const fromAncestors = ancestorChainForPath(fromId, parentById);
+  const toAncestors = ancestorChainForPath(toId, parentById);
+  const fromSet = new Set(fromAncestors);
+  const lcaToIndex = toAncestors.findIndex((ancestor) => fromSet.has(ancestor));
+  if (lcaToIndex < 0) return [fromId, toId];
+  const lca = toAncestors[lcaToIndex];
+  const lcaFromIndex = fromAncestors.indexOf(lca);
+  return [
+    ...fromAncestors.slice(0, lcaFromIndex + 1),
+    ...toAncestors.slice(0, lcaToIndex).reverse()
+  ];
+}
+
+function l1SiblingPathBetween(fromL1Id, toL1Id, childrenByParentId) {
+  if (!fromL1Id || !toL1Id) return null;
+  if (fromL1Id === toL1Id) return [fromL1Id];
+  const l1Ids = childrenByParentId.get(ROOT_NODE_ID) ?? [];
+  const fromIndex = l1Ids.indexOf(fromL1Id);
+  const toIndex = l1Ids.indexOf(toL1Id);
+  if (fromIndex < 0 || toIndex < 0) return null;
+  const start = Math.min(fromIndex, toIndex);
+  const end = Math.max(fromIndex, toIndex);
+  const segment = l1Ids.slice(start, end + 1);
+  return fromIndex <= toIndex ? segment : segment.reverse();
+}
+
+function visiblePathBetween(fromId, toId, context) {
+  const path = treePathBetween(fromId, toId, context.parentById);
+  const rootIndex = path.indexOf(ROOT_NODE_ID);
+  if (rootIndex < 0) return path;
+
+  const fromL1Id = path[rootIndex - 1] ?? null;
+  const toL1Id = path[rootIndex + 1] ?? null;
+  const siblingPath = l1SiblingPathBetween(fromL1Id, toL1Id, context.childrenByParentId);
+  if (!siblingPath || siblingPath.length === 0) {
+    return path;
+  }
+
+  return [
+    ...path.slice(0, Math.max(0, rootIndex - 1)),
+    ...siblingPath,
+    ...path.slice(rootIndex + 2)
+  ];
+}
+
+function compactPath(nodeIds) {
+  const compacted = [];
+  for (const nodeIdValue of nodeIds) {
+    if (!nodeIdValue) continue;
+    if (compacted.at(-1) !== nodeIdValue) {
+      compacted.push(nodeIdValue);
+    }
+  }
+  return compacted;
+}
+
+function buildPlaybackTargetIds(context = buildVisiblePathContext()) {
+  const stagedOrderIndices = [];
+  const seenOrders = new Set();
+  for (const stage of state.data?.path?.path_stages ?? []) {
+    for (const orderIndex of stage.toc_order_indices ?? []) {
+      if (seenOrders.has(orderIndex) || !context.visibleOrderSet.has(orderIndex)) continue;
+      seenOrders.add(orderIndex);
+      stagedOrderIndices.push(orderIndex);
+    }
+  }
+
+  const rankedTargets = stagedOrderIndices
+    .map((orderIndex) => state.entriesByOrder.get(orderIndex))
+    .filter((entry) => entry && playbackImportance(entry) > PLAYBACK_IMPORTANCE_THRESHOLD)
+    .map((entry) => nodeId(entry.order_index));
+
+  if (rankedTargets.length >= 2) {
+    return rankedTargets;
+  }
+
+  return stagedOrderIndices
+    .map((orderIndex) => state.entriesByOrder.get(orderIndex))
+    .filter(Boolean)
+    .map((entry) => nodeId(entry.order_index));
+}
+
+function buildPlaybackRoute() {
+  const context = buildVisiblePathContext();
+  const targets = buildPlaybackTargetIds(context);
+  if (targets.length < 2) return [];
+
+  const route = [targets[0]];
+  for (let index = 1; index < targets.length; index += 1) {
+    const fromId = route.at(-1);
+    const toId = targets[index];
+    if (!fromId || fromId === toId) continue;
+    const segment = visiblePathBetween(fromId, toId, context);
+    route.push(...segment.slice(1));
+  }
+
+  const compacted = compactPath(route);
+  if (compacted.includes(ROOT_NODE_ID)) {
+    return [];
+  }
+  return compacted.filter(
+    (nodeIdValue) => nodeIdValue !== ROOT_NODE_ID && context.visibleNodeIds.has(nodeIdValue)
+  );
+}
+
+function undirectedEdgeKey(source, target) {
+  return source <= target ? `${source}\u0000${target}` : `${target}\u0000${source}`;
+}
+
+function canonicalPlaybackEdges(route, spec) {
+  if (!Array.isArray(route) || !spec) return [];
+  const edgesByKey = new Map();
+  for (const edge of spec.edges ?? []) {
+    edgesByKey.set(undirectedEdgeKey(edge.source, edge.target), edge);
+  }
+
+  const seen = new Set();
+  const edges = [];
+  for (let index = 1; index < route.length; index += 1) {
+    const edge = edgesByKey.get(undirectedEdgeKey(route[index - 1], route[index]));
+    if (!edge) continue;
+    const key = undirectedEdgeKey(edge.source, edge.target);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    edges.push({ source: edge.source, target: edge.target });
+  }
+  return edges;
+}
+
+function overlayNodeColors(spec) {
+  const colors = new Map();
+  for (const node of spec?.nodes ?? []) {
+    colors.set(node.id, node.color ?? node.style?.fill_color ?? "#64748b");
+  }
+  return colors;
+}
+
+function overlayStrokeStyle(ctx, segment, opacity = 0.95) {
+  const sourceColor = segment.sourceColor ?? "#ef4444";
+  const targetColor = segment.targetColor ?? sourceColor;
+  let gradient;
+  try {
+    gradient = ctx.createLinearGradient(segment.x1, segment.y1, segment.x2, segment.y2);
+    gradient.addColorStop(0, sourceColor);
+    gradient.addColorStop(1, targetColor);
+  } catch {
+    return TRACKING_FALLBACK_STROKE;
+  }
+  ctx.globalAlpha = opacity;
+  return gradient;
+}
+
+function selectedNodeOverlayFrame() {
+  if (
+    !state.selectedNodeId ||
+    !state.currentSpec ||
+    !state.currentLayout ||
+    state.sessionHandle == null ||
+    typeof wasm.get_network_view_session !== "function"
+  ) {
+    return null;
+  }
+
+  const view = wasm.get_network_view_session(state.sessionHandle);
+  if (!view) return null;
+
+  if (state.motionEnabled && hasRadialHierarchy(state.currentSpec)) {
+    const frameData = canvasMotionFrameData(
+      state.currentSpec,
+      state.currentLayout,
+      view,
+      state.motionTimeSeconds
+    );
+    const motionFrame = frameData?.frames?.get(state.selectedNodeId);
+    if (motionFrame) {
+      return {
+        ...motionFrame,
+        selectionStyle: frameData.selectionStyle
+      };
+    }
+  }
+
+  const node = state.currentSpec.nodes.find((item) => item.id === state.selectedNodeId);
+  const point = state.currentLayout[state.selectedNodeId];
+  if (!node || !point) return null;
+  return {
+    node,
+    style: scaleNodeStyleForCanvas(resolveNodeStyleForCanvas(state.currentSpec, node), view.zoom),
+    view,
+    x: point.x * view.zoom + view.translate_x,
+    y: point.y * view.zoom + view.translate_y,
+    selectionStyle: scaleSelectionStyleForCanvas(resolveSelectionStyleForCanvas(state.currentSpec), view.zoom)
+  };
+}
+
+function isRectangularSelectionShape(shape) {
+  const value = String(shape ?? "").toLowerCase();
+  return value === "square" || value === "rect" || value === "rectangle";
+}
+
+function rectanglePerimeterPoint(cx, cy, radius, distance) {
+  const side = radius * 2;
+  const perimeter = side * SELECTED_RECT_EDGE_COUNT;
+  let offset = ((distance % perimeter) + perimeter) % perimeter;
+  const left = cx - radius;
+  const right = cx + radius;
+  const top = cy - radius;
+  const bottom = cy + radius;
+
+  if (offset <= side) return { x: left + offset, y: top };
+  offset -= side;
+  if (offset <= side) return { x: right, y: top + offset };
+  offset -= side;
+  if (offset <= side) return { x: right - offset, y: bottom };
+  offset -= side;
+  return { x: left, y: bottom - offset };
+}
+
+function drawRectanglePerimeterSegment(ctx, cx, cy, radius, startDistance, segmentLength) {
+  const side = radius * 2;
+  const perimeter = side * SELECTED_RECT_EDGE_COUNT;
+  if (perimeter <= 0 || segmentLength <= 0) return;
+
+  let distance = ((startDistance % perimeter) + perimeter) % perimeter;
+  let remaining = Math.min(segmentLength, perimeter);
+  const start = rectanglePerimeterPoint(cx, cy, radius, distance);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  for (let guard = 0; remaining > 0.01 && guard < SELECTED_RECT_EDGE_COUNT + 2; guard += 1) {
+    const edgeIndex = Math.min(SELECTED_RECT_EDGE_COUNT - 1, Math.floor(distance / side));
+    const edgeEnd = (edgeIndex + 1) * side;
+    const distanceToCorner = edgeEnd - distance;
+    if (distanceToCorner <= 0.01) {
+      distance = edgeEnd % perimeter;
+      continue;
+    }
+    const step = Math.min(remaining, distanceToCorner);
+    distance = (distance + step) % perimeter;
+    remaining -= step;
+    const next = rectanglePerimeterPoint(cx, cy, radius, distance);
+    ctx.lineTo(next.x, next.y);
+  }
+  ctx.stroke();
+}
+
+function drawSelectedCircleOverlay(ctx, frame, color, radius, phase) {
+  ctx.strokeStyle = cssColor(color, SELECTED_ARC_BASE_OPACITY);
+  ctx.beginPath();
+  ctx.arc(frame.x, frame.y, radius, 0, TAU);
+  ctx.stroke();
+
+  ctx.strokeStyle = cssColor(color, SELECTED_ARC_OPACITY);
+  for (let index = 0; index < SELECTED_ARC_COUNT; index += 1) {
+    const start = phase + index * SELECTED_ARC_STEP;
+    ctx.beginPath();
+    ctx.arc(frame.x, frame.y, radius, start, start + SELECTED_ARC_SPAN);
+    ctx.stroke();
+  }
+}
+
+function drawSelectedRectangleOverlay(ctx, frame, color, radius, now) {
+  const side = radius * 2;
+  const perimeter = side * SELECTED_RECT_EDGE_COUNT;
+  const phase = ((now % SELECTED_RECT_CYCLE_MS) / SELECTED_RECT_CYCLE_MS) * TAU;
+  const phaseDistance = (phase / TAU) * perimeter;
+  const segmentStep = perimeter / SELECTED_RECT_EDGE_COUNT;
+  const segmentLength = segmentStep * SELECTED_RECT_SEGMENT_RATIO;
+
+  ctx.strokeStyle = cssColor(color, SELECTED_ARC_BASE_OPACITY);
+  ctx.beginPath();
+  ctx.rect(frame.x - radius, frame.y - radius, side, side);
+  ctx.stroke();
+
+  ctx.strokeStyle = cssColor(color, SELECTED_ARC_OPACITY);
+  for (let index = 0; index < SELECTED_RECT_EDGE_COUNT; index += 1) {
+    drawRectanglePerimeterSegment(
+      ctx,
+      frame.x,
+      frame.y,
+      radius,
+      phaseDistance + index * segmentStep,
+      segmentLength
+    );
+  }
+}
+
+function drawSelectedNodeOverlay(now = performance.now()) {
+  const frame = selectedNodeOverlayFrame();
+  if (!frame || frame.style.opacity <= 0) return;
+
+  const ctx = dom.overlayCanvas.getContext("2d");
+  if (!ctx) return;
+
+  const color = frame.style.fillColor ?? frame.node.color ?? "#64748b";
+  const selectionPadding = Math.max(scale(8, 1), frame.selectionStyle?.padding ?? 0);
+  const radius = frame.style.radius + selectionPadding;
+  const lineWidth = Math.max(scale(3, 1), Math.round(frame.style.radius * 0.16));
+  const phase = ((now % SELECTED_ARC_CYCLE_MS) / SELECTED_ARC_CYCLE_MS) * TAU;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.lineWidth = lineWidth;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash([]);
+
+  if (isRectangularSelectionShape(frame.style.shape)) {
+    drawSelectedRectangleOverlay(ctx, frame, color, radius, now);
+  } else {
+    drawSelectedCircleOverlay(ctx, frame, color, radius, phase);
+  }
+  ctx.restore();
+}
+
+function invalidatePathPlaybackOverlay() {
+  state.pathPlaybackRouteSegments = null;
+  state.pathPlaybackOverlaySegments = null;
+}
+
+function clearPathPlaybackOverlay() {
+  const ctx = dom.overlayCanvas.getContext("2d");
+  if (!ctx) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, dom.overlayCanvas.width, dom.overlayCanvas.height);
+  ctx.restore();
+}
+
+function staticLayoutScreenFrames(layout, view) {
+  const frames = new Map();
+  for (const [id, point] of Object.entries(layout ?? {})) {
+    if (!point) continue;
+    frames.set(id, {
+      x: point.x * view.zoom + view.translate_x,
+      y: point.y * view.zoom + view.translate_y
+    });
+  }
+  return frames;
+}
+
+function pathPlaybackScreenFrames() {
+  if (
+    !state.currentLayout ||
+    state.sessionHandle == null ||
+    typeof wasm.get_network_view_session !== "function"
+  ) {
+    return null;
+  }
+  const view = wasm.get_network_view_session(state.sessionHandle);
+  if (!view) return null;
+
+  if (state.motionEnabled && state.currentSpec && hasRadialHierarchy(state.currentSpec)) {
+    const frameData = canvasMotionFrameData(state.currentSpec, state.currentLayout, view, state.motionTimeSeconds);
+    if (frameData?.frames) {
+      return frameData.frames;
+    }
+  }
+
+  return staticLayoutScreenFrames(state.currentLayout, view);
+}
+
+function pathPlaybackOverlaySegments() {
+  const useCache = !state.motionEnabled;
+  if (useCache && state.pathPlaybackOverlaySegments != null) {
+    return state.pathPlaybackOverlaySegments;
+  }
+  if (
+    !state.pathPlaybackActive ||
+    !state.currentSpec ||
+    !state.currentLayout ||
+    !Array.isArray(state.pathPlaybackNodeIds) ||
+    state.sessionHandle == null
+  ) {
+    return [];
+  }
+
+  const frames = pathPlaybackScreenFrames();
+  if (!frames) return [];
+
+  const nodeColors = overlayNodeColors(state.currentSpec);
+  const segments = canonicalPlaybackEdges(state.pathPlaybackNodeIds, state.currentSpec)
+    .map((edge) => {
+      const source = frames.get(edge.source);
+      const target = frames.get(edge.target);
+      if (!source || !target) return null;
+      return {
+        x1: source.x,
+        y1: source.y,
+        x2: target.x,
+        y2: target.y,
+        sourceColor: nodeColors.get(edge.source) ?? "#ef4444",
+        targetColor: nodeColors.get(edge.target) ?? nodeColors.get(edge.source) ?? "#ef4444"
+      };
+    })
+    .filter(Boolean);
+  if (useCache) {
+    state.pathPlaybackOverlaySegments = segments;
+  }
+  return segments;
+}
+
+function pathPlaybackRouteOverlaySegments() {
+  const useCache = !state.motionEnabled;
+  if (useCache && state.pathPlaybackRouteSegments != null) {
+    return state.pathPlaybackRouteSegments;
+  }
+  if (
+    !state.pathPlaybackActive ||
+    !state.currentLayout ||
+    !Array.isArray(state.pathPlaybackNodeIds) ||
+    state.sessionHandle == null
+  ) {
+    return [];
+  }
+
+  const frames = pathPlaybackScreenFrames();
+  if (!frames) return [];
+
+  const segments = [];
+  for (let index = 1; index < state.pathPlaybackNodeIds.length; index += 1) {
+    const source = frames.get(state.pathPlaybackNodeIds[index - 1]);
+    const target = frames.get(state.pathPlaybackNodeIds[index]);
+    if (!source || !target) continue;
+    segments.push({
+      x1: source.x,
+      y1: source.y,
+      x2: target.x,
+      y2: target.y
+    });
+  }
+  if (useCache) {
+    state.pathPlaybackRouteSegments = segments;
+  }
+  return segments;
+}
+
+function drawPathPlaybackRevealOverlay(progress) {
+  const segments = pathPlaybackOverlaySegments();
+  if (segments.length === 0) return;
+
+  const ctx = dom.overlayCanvas.getContext("2d");
+  if (!ctx) return;
+  const scaledProgress = Math.max(0, Math.min(1, progress)) * segments.length;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.lineWidth = TRACKING_DASH_WIDTH;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash([]);
+  for (let index = 0; index < segments.length; index += 1) {
+    const completion = Math.max(0, Math.min(1, scaledProgress - index));
+    if (completion <= 0) break;
+    const segment = segments[index];
+    const x2 = segment.x1 + (segment.x2 - segment.x1) * completion;
+    const y2 = segment.y1 + (segment.y2 - segment.y1) * completion;
+    const opacity = 0.95 * (0.35 + 0.65 * completion);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = overlayStrokeStyle(ctx, segment, opacity);
+    ctx.beginPath();
+    ctx.moveTo(segment.x1, segment.y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawPathPlaybackOverlay(dashPhase = state.pathPlaybackDashPhase) {
+  if (!state.pathPlaybackActive) return;
+
+  if (!state.pathPlaybackCompleted) {
+    drawPathPlaybackRevealOverlay(state.pathPlaybackProgress);
+    return;
+  }
+
+  const segments = pathPlaybackOverlaySegments();
+  if (segments.length === 0) return;
+
+  const ctx = dom.overlayCanvas.getContext("2d");
+  if (!ctx) return;
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.lineWidth = TRACKING_DASH_WIDTH;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash(TRACKING_DASH_PATTERN);
+  ctx.lineDashOffset = -dashPhase * TRACKING_DASH_PERIOD;
+  for (const segment of segments) {
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = overlayStrokeStyle(ctx, segment, 0.95);
+    ctx.beginPath();
+    ctx.moveTo(segment.x1, segment.y1);
+    ctx.lineTo(segment.x2, segment.y2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawGraphOverlay(now = performance.now()) {
+  clearPathPlaybackOverlay();
+  drawPathPlaybackOverlay(state.pathPlaybackDashPhase);
+  drawSelectedNodeOverlay(now);
+}
+
+function renderPathPlaybackAnimationFrame() {
+  if (state.motionEnabled || state.userTransformActive) {
+    renderNetworkFrame();
+    return;
+  }
+  drawGraphOverlay();
+}
+
 function buildSpec() {
   if (isNavilLayoutSubgraph()) {
     return buildNavilLayoutSubgraphSpec();
@@ -1128,6 +1841,7 @@ function buildSpec() {
   const rows = visibleEntries();
   const visible = rows.map((row) => row.entry);
   const visibleIds = new Set(visible.map((entry) => entry.order_index));
+  const colorByOrder = buildEntryColorMap(visible);
   const nodes = [
     {
       id: ROOT_NODE_ID,
@@ -1145,7 +1859,7 @@ function buildSpec() {
   for (const entry of visible) {
     const orderIndex = entry.order_index;
     const id = nodeId(orderIndex);
-    const color = nodeColor(entry);
+    const color = colorByOrder.get(orderIndex) ?? nodeColor(entry);
     const childCount = entryChildren(entry).length;
     const expanded = state.expandedIds.has(id);
     const radius = relevanceRadius(entry);
@@ -1289,7 +2003,7 @@ function buildSpec() {
     cooling_rate: 0.92,
     selected_node_id: state.selectedNodeId,
     default_edge_style: { stroke_color: "#8b96a5", stroke_width: scale(1, 0), opacity: 0.3 },
-    selection_style: { stroke_color: "#0f172a", stroke_width: scale(4, 1), padding: scale(8, 1) },
+    selection_style: { stroke_color: "#0f172a", stroke_width: 0, padding: scale(8, 1) },
     margin: scale(48, 1),
     motion: motionSpec()
   };
@@ -1310,6 +2024,7 @@ function buildNavilLayoutSubgraphSpec() {
   const rows = visibleEntriesFromTopEntries(topEntriesForOrderSet(allowedOrderSet), allowedOrderSet);
   const visible = rows.map((row) => row.entry);
   const visibleIds = new Set(visible.map((entry) => entry.order_index));
+  const colorByOrder = buildEntryColorMap(visible);
   const nodes = [
     {
       id: ROOT_NODE_ID,
@@ -1330,7 +2045,7 @@ function buildNavilLayoutSubgraphSpec() {
   for (const entry of visible) {
     const orderIndex = entry.order_index;
     const id = nodeId(orderIndex);
-    const color = nodeColor(entry);
+    const color = colorByOrder.get(orderIndex) ?? nodeColor(entry);
     const childCount = entryChildren(entry).length;
     const expanded = state.expandedIds.has(id);
     const stage = state.stageByOrder.get(orderIndex);
@@ -1480,8 +2195,8 @@ function buildNavilLayoutSubgraphSpec() {
       ? { stroke_color: "#8b96a5", stroke_width: scale(1, 0), opacity: 0.3 }
       : { stroke_color: "#657186", stroke_width: scale(1, 0), opacity: 0.32 },
     selection_style: variant.useDemoParams
-      ? { stroke_color: "#0f172a", stroke_width: scale(4, 1), padding: scale(8, 1) }
-      : { stroke_color: "#9ca3af", stroke_width: scale(4, 1), padding: scale(8, 1) },
+      ? { stroke_color: "#0f172a", stroke_width: 0, padding: scale(8, 1) }
+      : { stroke_color: "#9ca3af", stroke_width: 0, padding: scale(8, 1) },
     margin: scale(variant.useDemoParams ? 48 : 40, 1),
     motion: motionSpec()
   };
@@ -1495,6 +2210,15 @@ function buildNavilLayoutSubgraphSpec() {
 function destroySession() {
   cancelTopologyAnimation();
   cancelMotionAnimation();
+  cancelPathPlaybackAnimation();
+  cancelSelectionAnimation();
+  state.pathPlaybackActive = false;
+  state.pathPlaybackNodeIds = null;
+  state.pathPlaybackProgress = 0;
+  state.pathPlaybackCompleted = false;
+  state.pathPlaybackDashPhase = 0;
+  invalidatePathPlaybackOverlay();
+  clearPathPlaybackOverlay();
   if (state.sessionHandle == null || typeof wasm.destroy_network_session !== "function") {
     state.sessionHandle = null;
     return;
@@ -1521,6 +2245,165 @@ function cancelMotionAnimation() {
   state.motionLastFrameMs = null;
 }
 
+function advanceMotionClock(now) {
+  if (state.motionLastFrameMs != null) {
+    const deltaSeconds = (now - state.motionLastFrameMs) / 1000;
+    if (Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
+      state.motionTimeSeconds += Math.min(deltaSeconds, MAX_MOTION_DELTA_SECONDS);
+    }
+  }
+  state.motionLastFrameMs = now;
+}
+
+function cancelPathPlaybackAnimation() {
+  if (state.pathPlaybackFrame != null) {
+    cancelAnimationFrame(state.pathPlaybackFrame);
+    state.pathPlaybackFrame = null;
+  }
+}
+
+function cancelSelectionAnimation() {
+  if (state.selectionFrame != null) {
+    cancelAnimationFrame(state.selectionFrame);
+    state.selectionFrame = null;
+  }
+}
+
+function shouldRunSelectionAnimation() {
+  return Boolean(
+    state.selectedNodeId &&
+    !state.motionEnabled &&
+    !state.pathPlaybackActive &&
+    state.transitionFrame == null &&
+    state.sessionHandle != null
+  );
+}
+
+function startSelectionAnimation() {
+  if (state.selectionFrame != null) return;
+  if (!shouldRunSelectionAnimation()) return;
+
+  const handle = state.sessionHandle;
+  const tick = (now) => {
+    if (state.sessionHandle !== handle || !shouldRunSelectionAnimation()) {
+      state.selectionFrame = null;
+      return;
+    }
+    drawGraphOverlay(now);
+    state.selectionFrame = requestAnimationFrame(tick);
+  };
+  state.selectionFrame = requestAnimationFrame(tick);
+}
+
+function scheduleSelectionAnimationStart(delayMs = 0, attempts = 8) {
+  window.setTimeout(() => {
+    startSelectionAnimation();
+    if (attempts > 1 && shouldRunSelectionAnimation() && state.selectionFrame == null) {
+      scheduleSelectionAnimationStart(120, attempts - 1);
+    }
+  }, delayMs);
+}
+
+function clearPathPlayback({ rerender = true } = {}) {
+  const hadPlayback = state.pathPlaybackActive || state.pathPlaybackNodeIds != null;
+  cancelPathPlaybackAnimation();
+  state.pathPlaybackActive = false;
+  state.pathPlaybackNodeIds = null;
+  state.pathPlaybackProgress = 0;
+  state.pathPlaybackCompleted = false;
+  state.pathPlaybackDashPhase = 0;
+  invalidatePathPlaybackOverlay();
+  clearPathPlaybackOverlay();
+  if (
+    state.sessionHandle != null &&
+    typeof wasm.clear_network_tracking_path_session === "function"
+  ) {
+    wasm.clear_network_tracking_path_session(state.sessionHandle);
+  }
+  if (state.data) {
+    renderSidebar();
+  }
+  if (rerender && state.sessionHandle != null && hadPlayback) {
+    renderNetworkFrame();
+    startMotionAnimation();
+    startSelectionAnimation();
+  }
+}
+
+function startPathPlayback() {
+  if (state.sessionHandle == null || state.transitionFrame != null) return;
+
+  const route = buildPlaybackRoute();
+  if (route.length < 2) {
+    setStatus("warning", "No playable path.", "The visible graph does not contain at least two ranked path nodes.");
+    clearPathPlayback({ rerender: true });
+    return;
+  }
+
+  clearPathPlayback({ rerender: false });
+  cancelMotionAnimation();
+  cancelSelectionAnimation();
+
+  try {
+    const handle = state.sessionHandle;
+    state.pathPlaybackActive = true;
+    state.pathPlaybackNodeIds = route;
+    state.pathPlaybackProgress = 0;
+    state.pathPlaybackCompleted = false;
+    state.pathPlaybackDashPhase = 0;
+    invalidatePathPlaybackOverlay();
+    clearPathPlaybackOverlay();
+    renderSidebar();
+    clearStatus();
+    renderNetworkFrame();
+
+    const totalDuration = Math.min(
+      TRACKING_MAX_DURATION_MS,
+      Math.max(TRACKING_EDGE_DURATION_MS, (route.length - 1) * TRACKING_EDGE_DURATION_MS)
+    );
+    const startedAt = performance.now();
+    const tick = (now) => {
+      if (!state.pathPlaybackActive || state.sessionHandle !== handle) {
+        state.pathPlaybackFrame = null;
+        state.motionLastFrameMs = null;
+        return;
+      }
+      if (state.motionEnabled) {
+        advanceMotionClock(now);
+      }
+      const progress = Math.min(1, Math.max(0, (now - startedAt) / totalDuration));
+      state.pathPlaybackProgress = progress;
+      if (progress < 1) {
+        state.pathPlaybackCompleted = false;
+        state.pathPlaybackDashPhase = 0;
+        renderPathPlaybackAnimationFrame();
+        state.pathPlaybackFrame = requestAnimationFrame(tick);
+        return;
+      }
+
+      if (!state.pathPlaybackCompleted) {
+        state.pathPlaybackCompleted = true;
+        state.pathPlaybackDashPhase = 0;
+        invalidatePathPlaybackOverlay();
+        renderNetworkFrame();
+      }
+      const dashElapsed = now - (startedAt + totalDuration);
+      const dashPhase = (
+        ((dashElapsed % TRACKING_DASH_CYCLE_MS) + TRACKING_DASH_CYCLE_MS) %
+        TRACKING_DASH_CYCLE_MS
+      ) / TRACKING_DASH_CYCLE_MS;
+      state.pathPlaybackDashPhase = dashPhase;
+      renderPathPlaybackAnimationFrame();
+      state.pathPlaybackFrame = requestAnimationFrame(tick);
+    };
+    state.pathPlaybackFrame = requestAnimationFrame(tick);
+  } catch (error) {
+    console.error("[navil-network] path playback failed", error);
+    setStatus("error", "Path playback failed.", error?.message ?? String(error));
+    clearPathPlayback({ rerender: true });
+  }
+}
+
 function syncSession({ recreate = false } = {}) {
   const spec = buildSpec();
   state.currentSpec = spec;
@@ -1535,6 +2418,35 @@ function syncSession({ recreate = false } = {}) {
 }
 
 function renderNetworkFrame(timeSeconds = state.motionTimeSeconds) {
+  if (state.pathPlaybackActive && state.sessionHandle != null) {
+    if (
+      state.motionEnabled &&
+      typeof wasm.get_network_view_session === "function" &&
+      drawCanvasMotionFrame(
+        state.currentSpec,
+        state.currentLayout,
+        wasm.get_network_view_session(state.sessionHandle),
+        timeSeconds
+      )
+    ) {
+      drawGraphOverlay();
+      startSelectionAnimation();
+      return;
+    }
+    if (
+      state.motionEnabled &&
+      typeof wasm.render_network_motion_session === "function"
+    ) {
+      wasm.render_network_motion_session(state.sessionHandle, timeSeconds);
+      drawGraphOverlay();
+      startSelectionAnimation();
+      return;
+    }
+    wasm.render_network_session(state.sessionHandle);
+    drawGraphOverlay();
+    startSelectionAnimation();
+    return;
+  }
   if (
     state.motionEnabled &&
     state.sessionHandle != null &&
@@ -1546,6 +2458,8 @@ function renderNetworkFrame(timeSeconds = state.motionTimeSeconds) {
       timeSeconds
     )
   ) {
+    drawGraphOverlay();
+    startSelectionAnimation();
     return;
   }
   if (
@@ -1554,15 +2468,23 @@ function renderNetworkFrame(timeSeconds = state.motionTimeSeconds) {
     typeof wasm.render_network_motion_session === "function"
   ) {
     wasm.render_network_motion_session(state.sessionHandle, timeSeconds);
+    drawGraphOverlay();
+    startSelectionAnimation();
     return;
   }
   wasm.render_network_session(state.sessionHandle);
+  drawGraphOverlay();
+  startSelectionAnimation();
 }
 
 function startMotionAnimation() {
   cancelMotionAnimation();
+  if (state.motionEnabled) {
+    cancelSelectionAnimation();
+  }
   if (
     !state.motionEnabled ||
+    state.pathPlaybackActive ||
     state.sessionHandle == null ||
     typeof wasm.render_network_motion_session !== "function"
   ) {
@@ -1571,18 +2493,17 @@ function startMotionAnimation() {
 
   const handle = state.sessionHandle;
   const tick = (now) => {
-    if (!state.motionEnabled || state.sessionHandle !== handle || state.transitionFrame != null) {
+    if (
+      !state.motionEnabled ||
+      state.pathPlaybackActive ||
+      state.sessionHandle !== handle ||
+      state.transitionFrame != null
+    ) {
       state.motionFrame = null;
       state.motionLastFrameMs = null;
       return;
     }
-    if (state.motionLastFrameMs != null) {
-      const deltaSeconds = (now - state.motionLastFrameMs) / 1000;
-      if (Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
-        state.motionTimeSeconds += Math.min(deltaSeconds, MAX_MOTION_DELTA_SECONDS);
-      }
-    }
-    state.motionLastFrameMs = now;
+    advanceMotionClock(now);
     try {
       renderNetworkFrame(state.motionTimeSeconds);
     } catch (error) {
@@ -1608,6 +2529,7 @@ function animateTopologyTransition() {
   ) {
     renderNetworkFrame();
     startMotionAnimation();
+    startSelectionAnimation();
     return;
   }
 
@@ -1641,6 +2563,7 @@ function animateTopologyTransition() {
     }
     renderNetworkFrame();
     startMotionAnimation();
+    startSelectionAnimation();
   };
 
   wasm.render_network_transition_session(handle, 0);
@@ -1650,6 +2573,7 @@ function animateTopologyTransition() {
 function renderGraph({ recreate = false, animateTopology = false } = {}) {
   cancelTopologyAnimation();
   cancelMotionAnimation();
+  cancelSelectionAnimation();
   const sizeChanged = syncCanvasSize();
   syncSession({ recreate: recreate || sizeChanged });
   renderMetrics();
@@ -1658,6 +2582,7 @@ function renderGraph({ recreate = false, animateTopology = false } = {}) {
   } else {
     renderNetworkFrame();
     startMotionAnimation();
+    startSelectionAnimation();
   }
 }
 
@@ -1670,7 +2595,10 @@ function focusSelectedNode() {
   });
   if (view && typeof wasm.set_network_view_session === "function") {
     wasm.set_network_view_session(state.sessionHandle, view);
+    invalidatePathPlaybackOverlay();
     renderNetworkFrame();
+    startSelectionAnimation();
+    scheduleSelectionAnimationStart(80, 4);
   }
 }
 
@@ -1716,12 +2644,17 @@ function renderSidebar() {
     state.activeSubgraphId === COMPONENT_SUBGRAPH_ID && state.activeSubgraphLayout === SUBGRAPH_LAYOUT.NAVIL_DEMO_PARAMS
   );
   dom.wholeGraph.classList.toggle("is-active", state.activeSubgraphId == null);
+  dom.playPath.classList.toggle("is-active", state.pathPlaybackActive);
+  dom.playPath.disabled = buildPlaybackRoute().length < 2;
+  dom.clearPath.disabled = !state.pathPlaybackActive;
   dom.motionToggle.classList.toggle("is-active", state.motionEnabled);
   for (const button of dom.motionModeButtons) {
     button.classList.toggle("is-active", button.dataset.motionMode === state.motionMode);
   }
   const fragment = document.createDocumentFragment();
-  for (const { entry, depth } of visibleEntries()) {
+  const rows = visibleEntries();
+  const colorByOrder = buildEntryColorMap(rows.map((row) => row.entry));
+  for (const { entry, depth } of rows) {
     const id = nodeId(entry.order_index);
     const row = document.createElement("button");
     row.type = "button";
@@ -1748,7 +2681,7 @@ function renderSidebar() {
 
     const stage = document.createElement("span");
     stage.className = "toc-stage";
-    stage.style.background = stageColor(entry.order_index) ?? levelColor(entry);
+    stage.style.background = colorByOrder.get(entry.order_index) ?? nodeColor(entry);
     row.append(stage);
 
     const title = document.createElement("span");
@@ -1913,6 +2846,7 @@ function renderDetails() {
 function selectEntry(orderIndex, { focus = false, scroll = true } = {}) {
   const entry = state.entriesByOrder.get(orderIndex);
   if (!entry) return;
+  clearPathPlayback({ rerender: false });
   expandAncestors(entry);
   state.selectedNodeId = nodeId(orderIndex);
   renderSidebar();
@@ -1932,6 +2866,7 @@ function selectEntry(orderIndex, { focus = false, scroll = true } = {}) {
 function toggleEntry(orderIndex) {
   const entry = state.entriesByOrder.get(orderIndex);
   if (!entry || !hasChildren(entry)) return;
+  clearPathPlayback({ rerender: false });
   const id = nodeId(orderIndex);
   if (state.expandedIds.has(id)) {
     state.expandedIds.delete(id);
@@ -1950,6 +2885,7 @@ function toggleEntry(orderIndex) {
 }
 
 function resetDemo() {
+  clearPathPlayback({ rerender: false });
   state.expandedIds = initialExpandedIds();
   const subgraph = activeSubgraph();
   const initial = subgraph ? state.entriesByOrder.get(subgraph.root_order_index) : findInitialSelection();
@@ -1963,6 +2899,7 @@ function resetDemo() {
 }
 
 function expandAll() {
+  clearPathPlayback({ rerender: false });
   const subgraph = activeSubgraph();
   const entries = subgraph
     ? subgraph.toc_order_indices.map((orderIndex) => state.entriesByOrder.get(orderIndex)).filter(Boolean)
@@ -1975,6 +2912,7 @@ function expandAll() {
 }
 
 function collapseToChapters() {
+  clearPathPlayback({ rerender: false });
   if (activeSubgraph()) {
     loadComponentSubgraph(state.activeSubgraphLayout ?? SUBGRAPH_LAYOUT.DEMO);
     return;
@@ -1995,6 +2933,7 @@ function collapseToChapters() {
 function loadComponentSubgraph(layout) {
   const subgraph = state.componentSubgraphsById.get(COMPONENT_SUBGRAPH_ID);
   if (!subgraph) return;
+  clearPathPlayback({ rerender: false });
   state.activeSubgraphId = COMPONENT_SUBGRAPH_ID;
   state.activeSubgraphLayout = layout;
   state.expandedIds = initialExpandedIds();
@@ -2035,6 +2974,7 @@ function loadNavilDemoParamsSubgraph() {
 }
 
 function showWholeGraph() {
+  clearPathPlayback({ rerender: false });
   state.activeSubgraphId = null;
   state.activeSubgraphLayout = null;
   state.expandedIds = initialExpandedIds();
@@ -2073,6 +3013,8 @@ function attachControls() {
   dom.loadNavilAnchorStrongSubgraph.addEventListener("click", loadNavilAnchorStrongSubgraph);
   dom.loadNavilDemoParamsSubgraph.addEventListener("click", loadNavilDemoParamsSubgraph);
   dom.wholeGraph.addEventListener("click", showWholeGraph);
+  dom.playPath.addEventListener("click", startPathPlayback);
+  dom.clearPath.addEventListener("click", () => clearPathPlayback({ rerender: true }));
   dom.motionToggle.addEventListener("click", toggleMotion);
   for (const button of dom.motionModeButtons) {
     button.addEventListener("click", () => selectMotionMode(button.dataset.motionMode));
@@ -2105,6 +3047,7 @@ function attachCanvasInteractions() {
     drag.start = point;
     drag.last = point;
     drag.rotationAnchor = drag.mode === "rotate" ? graphRotationAnchorPoint() : null;
+    state.userTransformActive = true;
     dom.canvas.setPointerCapture(event.pointerId);
     dom.canvas.classList.toggle("is-dragging", drag.mode === "pan");
     dom.canvas.classList.toggle("is-rotating", drag.mode === "rotate");
@@ -2124,6 +3067,7 @@ function attachCanvasInteractions() {
       return;
     }
     wasm.pan_network_session(state.sessionHandle, dx, dy);
+    invalidatePathPlaybackOverlay();
     renderNetworkFrame();
   });
 
@@ -2135,6 +3079,7 @@ function attachCanvasInteractions() {
     drag.active = false;
     drag.mode = null;
     drag.rotationAnchor = null;
+    state.userTransformActive = false;
     dom.canvas.classList.remove("is-dragging");
     dom.canvas.classList.remove("is-rotating");
     if (dom.canvas.hasPointerCapture(event.pointerId)) {
@@ -2201,6 +3146,7 @@ function attachCanvasInteractions() {
       const point = eventPoint(event);
       const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
       wasm.zoom_network_session(state.sessionHandle, point.x, point.y, factor);
+      invalidatePathPlaybackOverlay();
       renderNetworkFrame();
     },
     { passive: false }
@@ -2229,6 +3175,7 @@ async function boot() {
   installDebugApi();
   resetDemo();
   clearStatus();
+  scheduleSelectionAnimationStart(0, 12);
 
   const observer = new ResizeObserver(() => {
     if (state.resizeFrame != null) {
@@ -2238,6 +3185,7 @@ async function boot() {
       state.resizeFrame = null;
       renderGraph({ recreate: true });
       focusSelectedNode();
+      scheduleSelectionAnimationStart(80, 4);
     });
   });
   observer.observe(dom.frame);
@@ -2251,5 +3199,11 @@ async function boot() {
     { once: true }
   );
 }
+
+window.setInterval(() => {
+  if (state.selectionFrame == null && shouldRunSelectionAnimation()) {
+    startSelectionAnimation();
+  }
+}, 250);
 
 boot();

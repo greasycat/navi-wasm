@@ -7,6 +7,10 @@ fn lerp_point(from: (f64, f64), to: (f64, f64), progress: f64) -> (f64, f64) {
     )
 }
 
+pub(in crate::network) fn tracking_uses_completed_overlay(tracking: &NetworkTrackedPath) -> bool {
+    tracking.progress >= 1.0
+}
+
 pub(in crate::network) fn draw_tracking_edges<DB>(
     root: &PlotArea<DB>,
     spec: &NetworkPlotSpec,
@@ -21,6 +25,10 @@ where
     let Some(tracking) = tracking else {
         return Ok(());
     };
+
+    if tracking_uses_completed_overlay(tracking) {
+        return Ok(());
+    }
 
     let viewport = PixelBounds::from_canvas(spec.width, spec.height);
     for (edge_index, node_pair) in tracking.node_ids.windows(2).enumerate() {
@@ -62,34 +70,8 @@ where
     Ok(())
 }
 
-pub(in crate::network) fn tracking_breath_strength(phase: f64) -> f64 {
-    let phase = if phase.is_finite() {
-        phase.rem_euclid(1.0)
-    } else {
-        0.0
-    };
-    0.5 - 0.5 * (TAU * phase).cos()
-}
-
-fn interpolate_rgb(from: RGBColor, to: RGBColor, t: f64) -> RGBColor {
-    let t = t.clamp(0.0, 1.0);
-    RGBColor(
-        (from.0 as f64 + (to.0 as f64 - from.0 as f64) * t).round() as u8,
-        (from.1 as f64 + (to.1 as f64 - from.1 as f64) * t).round() as u8,
-        (from.2 as f64 + (to.2 as f64 - from.2 as f64) * t).round() as u8,
-    )
-}
-
-pub(in crate::network) fn tracking_edge_color(tracking: &NetworkTrackedPath) -> RGBColor {
-    if tracking.progress >= 1.0 {
-        interpolate_rgb(
-            TRACKING_EDGE_BREATH_COLOR,
-            TRACKING_EDGE_COLOR,
-            tracking_breath_strength(tracking.breath_phase),
-        )
-    } else {
-        TRACKING_EDGE_COLOR
-    }
+pub(in crate::network) fn tracking_edge_color(_tracking: &NetworkTrackedPath) -> RGBColor {
+    TRACKING_EDGE_COLOR
 }
 
 pub(in crate::network) fn tracking_edge_opacity(

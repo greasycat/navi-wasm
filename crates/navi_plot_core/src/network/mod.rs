@@ -111,7 +111,6 @@ const TOGGLE_BADGE_MAX_RADIUS: i32 = 8;
 const TOGGLE_BADGE_FILL: RGBColor = RGBColor(148, 163, 184);
 const TOGGLE_BADGE_SYMBOL: RGBColor = RGBColor(255, 255, 255);
 const TRACKING_EDGE_COLOR: RGBColor = RGBColor(239, 68, 68);
-const TRACKING_EDGE_BREATH_COLOR: RGBColor = RGBColor(255, 255, 255);
 const TRACKING_EDGE_WIDTH: u32 = 4;
 const TRACKING_EDGE_OPACITY: f64 = 0.95;
 const TRACKING_NODE_BORDER_COLOR: RGBColor = RGBColor(239, 68, 68);
@@ -177,7 +176,7 @@ struct NetworkTransition {
 struct NetworkTrackedPath {
     node_ids: Vec<String>,
     progress: f64,
-    breath_phase: f64,
+    dash_phase: f64,
 }
 
 impl NetworkTrackedPath {
@@ -213,7 +212,7 @@ impl NetworkTrackedPath {
         Ok(Some(Self {
             node_ids,
             progress: 0.0,
-            breath_phase: 0.0,
+            dash_phase: 0.0,
         }))
     }
 
@@ -225,9 +224,9 @@ impl NetworkTrackedPath {
         };
     }
 
-    fn set_breath_phase(&mut self, breath_phase: f64) {
-        self.breath_phase = if breath_phase.is_finite() {
-            breath_phase.rem_euclid(1.0)
+    fn set_dash_phase(&mut self, dash_phase: f64) {
+        self.dash_phase = if dash_phase.is_finite() {
+            dash_phase.rem_euclid(1.0)
         } else {
             0.0
         };

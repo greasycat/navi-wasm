@@ -372,7 +372,7 @@ result_exports! {
         handle: u32,
         progress: f64,
     ) -> Result<(), wasm_bindgen::JsValue>;
-    fn set_network_tracking_breath_phase_session(
+    fn set_network_tracking_dash_phase_session(
         handle: u32,
         phase: f64,
     ) -> Result<(), wasm_bindgen::JsValue>;

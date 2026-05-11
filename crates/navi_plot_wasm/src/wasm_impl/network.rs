@@ -269,12 +269,12 @@ pub(crate) fn set_network_tracking_progress_session(
     })
 }
 
-pub(crate) fn set_network_tracking_breath_phase_session(
+pub(crate) fn set_network_tracking_dash_phase_session(
     handle: u32,
     phase: f64,
 ) -> Result<(), JsValue> {
     with_network_session_mut(handle, |entry| {
-        entry.session.set_tracking_breath_phase(phase);
+        entry.session.set_tracking_dash_phase(phase);
         Ok(())
     })
 }

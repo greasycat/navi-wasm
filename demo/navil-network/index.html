@@ -10,7 +10,7 @@
     />
     <link rel="stylesheet" href="../style.css" />
     <link rel="stylesheet" href="./navil-network.css" />
-    <script type="module" src="./navil-network.js"></script>
+    <script type="module" src="./navil-network.js?v=square-selection-marker-fix"></script>
   </head>
   <body class="navil-network-body">
     <main class="navil-shell">
@@ -28,6 +28,8 @@
           <button id="load-navil-anchor-strong-subgraph" type="button">Anchor + strong</button>
           <button id="load-navil-demo-params-subgraph" type="button">Demo params</button>
           <button id="whole-graph" type="button">Whole graph</button>
+          <button id="play-path" type="button">Play path</button>
+          <button id="clear-path" type="button">Clear path</button>
           <button id="motion-toggle" type="button">Motion</button>
           <button type="button" data-motion-mode="orbital">Orbit</button>
           <button type="button" data-motion-mode="drift">Drift</button>
@@ -72,7 +74,8 @@
             </div>
           </div>
           <div class="canvas-frame">
-            <canvas id="network-canvas"></canvas>
+            <canvas id="network-canvas" class="network-base-canvas"></canvas>
+            <canvas id="network-overlay-canvas" class="network-overlay-canvas" aria-hidden="true"></canvas>
           </div>
         </section>
 

@@ -108,7 +108,7 @@ Edge alpha = `phase_opacity × source_opacity × target_opacity`.
 
 ## Tracking Path (`crates/navi_plot_core/src/network/render/tracking.rs`)
 
-Path stored as `Vec<String>` node IDs + `progress ∈ [0, 1]` + `breath_phase ∈ [0, 1]`.
+Path stored as `Vec<String>` node IDs + `progress ∈ [0, 1]` + `dash_phase ∈ [0, 1]`.
 
 **Partial edge drawing** — for edge at index `i` of `n` total edges:
 ```
@@ -116,12 +116,12 @@ completion = clamp(progress × n - i, 0.0, 1.0)
 endpoint   = lerp(source_pos, target_pos, completion)
 ```
 
-**Color breathing** (activates after `progress = 1.0`):
+**Demo path overlay** — the Navil network demo draws path playback entirely on a transparent Canvas 2D overlay:
 ```
-strength = 0.5 - 0.5 × cos(2π × breath_phase)   // oscillates [0, 1]
-color    = lerp(TRACKING_EDGE_COLOR, TRACKING_BREATH_COLOR, strength)
+period = 14 + 10
+offset = dash_phase × period
 ```
-`TRACKING_EDGE_COLOR = RGB(239, 68, 68)` (red), `TRACKING_BREATH_COLOR` = white. Phase is driven externally by JS at ~2.4 s per cycle.
+The overlay uses native strokes for both the solid reveal and the completed dashed path. Both phases use the same canonical, deduped edge list, so backtracking route hops do not overdraw the same physical edge. Completed dashes use Canvas `setLineDash` and `lineDashOffset`, and animate in each graph edge's canonical `source → target` direction. The demo encodes sibling edges as first L1 → last L1 and hierarchy edges as parent/L1 → child, so a physical edge is drawn once and never animates in two directions. `TRACKING_EDGE_COLOR = RGB(239, 68, 68)` (red). Phase is driven externally by JS.
 
 Edge opacity ramps: `0.95 × (0.35 + 0.65 × completion)` → from 0.33 at start to 0.95 at completion.
 

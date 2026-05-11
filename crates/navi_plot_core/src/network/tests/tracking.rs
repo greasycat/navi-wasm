@@ -75,75 +75,50 @@ fn network_tracking_progress_advances_edges_and_current_node() {
 }
 
 #[test]
-fn network_tracking_breath_phase_wraps_inputs() {
+fn network_tracking_dash_phase_wraps_inputs() {
     let mut session = NetworkSession::new(sample_spec()).unwrap();
     session
         .set_tracking_path(vec!["a".to_string(), "b".to_string()])
         .unwrap();
 
-    session.set_tracking_breath_phase(1.25);
-    assert!(
-        (session
-            .tracking
-            .as_ref()
-            .expect("tracking path")
-            .breath_phase
-            - 0.25)
-            .abs()
-            < 1e-6
-    );
+    session.set_tracking_dash_phase(1.25);
+    assert!((session.tracking.as_ref().expect("tracking path").dash_phase - 0.25).abs() < 1e-6);
 
-    session.set_tracking_breath_phase(-0.2);
-    assert!(
-        (session
-            .tracking
-            .as_ref()
-            .expect("tracking path")
-            .breath_phase
-            - 0.8)
-            .abs()
-            < 1e-6
-    );
+    session.set_tracking_dash_phase(-0.2);
+    assert!((session.tracking.as_ref().expect("tracking path").dash_phase - 0.8).abs() < 1e-6);
 
-    session.set_tracking_breath_phase(f64::NAN);
+    session.set_tracking_dash_phase(f64::NAN);
     assert_eq!(
-        session
-            .tracking
-            .as_ref()
-            .expect("tracking path")
-            .breath_phase,
+        session.tracking.as_ref().expect("tracking path").dash_phase,
         0.0
     );
 }
 
 #[test]
-fn network_tracking_breath_color_reaches_expected_extrema() {
+fn network_tracking_completed_edge_color_stays_stable() {
     let tracking = NetworkTrackedPath {
         node_ids: vec!["a".to_string(), "b".to_string()],
         progress: 1.0,
-        breath_phase: 0.0,
+        dash_phase: 0.0,
     };
-    assert_eq!(tracking_edge_color(&tracking), TRACKING_EDGE_BREATH_COLOR);
+    assert_eq!(tracking_edge_color(&tracking), TRACKING_EDGE_COLOR);
     assert_eq!(tracking_edge_opacity(&tracking, 1.0), TRACKING_EDGE_OPACITY);
 
-    let peak_tracking = NetworkTrackedPath {
-        breath_phase: 0.5,
+    let shifted_tracking = NetworkTrackedPath {
+        dash_phase: 0.5,
         ..tracking.clone()
     };
-    assert_eq!(tracking_edge_color(&peak_tracking), TRACKING_EDGE_COLOR);
+    assert_eq!(tracking_edge_color(&shifted_tracking), TRACKING_EDGE_COLOR);
     assert_eq!(
-        tracking_edge_opacity(&peak_tracking, 1.0),
+        tracking_edge_opacity(&shifted_tracking, 1.0),
         TRACKING_EDGE_OPACITY
     );
 
     let looped_tracking = NetworkTrackedPath {
-        breath_phase: 1.0,
+        dash_phase: 1.0,
         ..tracking
     };
-    assert_eq!(
-        tracking_edge_color(&looped_tracking),
-        TRACKING_EDGE_BREATH_COLOR
-    );
+    assert_eq!(tracking_edge_color(&looped_tracking), TRACKING_EDGE_COLOR);
     assert_eq!(
         tracking_edge_opacity(&looped_tracking, 1.0),
         TRACKING_EDGE_OPACITY
@@ -151,15 +126,22 @@ fn network_tracking_breath_color_reaches_expected_extrema() {
 }
 
 #[test]
-fn network_tracking_breathing_only_applies_after_reveal_completes() {
+fn network_tracking_completed_overlay_only_applies_after_reveal_completes() {
     let tracking = NetworkTrackedPath {
         node_ids: vec!["a".to_string(), "b".to_string()],
         progress: 0.5,
-        breath_phase: 0.5,
+        dash_phase: 0.5,
     };
 
+    assert!(!tracking_uses_completed_overlay(&tracking));
     assert_eq!(tracking_edge_color(&tracking), TRACKING_EDGE_COLOR);
     assert!((tracking_edge_opacity(&tracking, 0.5) - TRACKING_EDGE_OPACITY * 0.675).abs() < 1e-6);
+
+    let completed_tracking = NetworkTrackedPath {
+        progress: 1.0,
+        ..tracking
+    };
+    assert!(tracking_uses_completed_overlay(&completed_tracking));
 }
 
 #[test]
@@ -167,7 +149,7 @@ fn network_tracking_marks_traversed_nodes_through_current_node() {
     let mut tracking = NetworkTrackedPath {
         node_ids: vec!["a".to_string(), "b".to_string(), "c".to_string()],
         progress: 0.0,
-        breath_phase: 0.0,
+        dash_phase: 0.0,
     };
 
     assert!(tracking.is_traversed_node("a"));
@@ -190,7 +172,7 @@ fn network_tracking_survives_selection_updates_and_clears_on_invalid_topology() 
         .set_tracking_path(vec!["a".to_string(), "b".to_string()])
         .unwrap();
     session.set_tracking_progress(0.6);
-    session.set_tracking_breath_phase(0.4);
+    session.set_tracking_dash_phase(0.4);
 
     session
         .update_spec(NetworkPlotSpec {
@@ -202,7 +184,7 @@ fn network_tracking_survives_selection_updates_and_clears_on_invalid_topology() 
     let tracking = session.tracking.as_ref().expect("tracking retained");
     assert_eq!(tracking.node_ids, vec!["a".to_string(), "b".to_string()]);
     assert!((tracking.progress - 0.6).abs() < 1e-6);
-    assert!((tracking.breath_phase - 0.4).abs() < 1e-6);
+    assert!((tracking.dash_phase - 0.4).abs() < 1e-6);
 
     session
         .update_spec(NetworkPlotSpec {

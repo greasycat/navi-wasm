@@ -68,7 +68,7 @@ impl NetworkSession {
                 .flatten()
                 .map(|mut resolved_tracking| {
                     resolved_tracking.set_progress(tracking.progress);
-                    resolved_tracking.set_breath_phase(tracking.breath_phase);
+                    resolved_tracking.set_dash_phase(tracking.dash_phase);
                     resolved_tracking
                 })
         });
@@ -254,9 +254,9 @@ impl NetworkSession {
         }
     }
 
-    pub fn set_tracking_breath_phase(&mut self, breath_phase: f64) {
+    pub fn set_tracking_dash_phase(&mut self, dash_phase: f64) {
         if let Some(tracking) = self.tracking.as_mut() {
-            tracking.set_breath_phase(breath_phase);
+            tracking.set_dash_phase(dash_phase);
         }
     }
 
