@@ -16,7 +16,7 @@ The repository is a Cargo workspace:
 - `crates/navi_plot_core` — pure-Rust rendering, layout, validation, hit-testing
 - `crates/navi_plot_wasm` — `wasm-bindgen` bindings for HTML canvas
 - `crates/server` — tiny Axum static-file server for the demo
-- `demo/` — static browser demo
+- `demo/` — static browser demos, including a Navil TOC network snapshot
 - `types/navi_plot_specs.d.ts` — TypeScript interfaces for all spec objects
 
 ---
@@ -50,6 +50,15 @@ just build        # wasm-pack build + link TS types into pkg/
 just serve        # start server (requires a prior build)
 just fmt          # cargo fmt --all
 just check        # cargo clippy -p navi_plot_core -D warnings
+```
+
+### Navil TOC demo data
+
+The standalone Navil TOC network demo reads a compact JSON fixture generated
+from the parent Navil database:
+
+```bash
+DATABASE_URL=<local-postgres-url> uv run python navi-wasm/scripts/export_navil_network_demo.py
 ```
 
 ---

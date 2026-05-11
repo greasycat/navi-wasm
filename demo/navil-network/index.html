@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Navil TOC Network | Navi WASM</title>
+    <meta
+      name="description"
+      content="Standalone Navi WASM demo rendering a Navil table-of-contents snapshot as a radial network graph."
+    />
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="./navil-network.css" />
+    <script type="module" src="./navil-network.js"></script>
+  </head>
+  <body class="navil-network-body">
+    <main class="navil-shell">
+      <header class="navil-topbar">
+        <a href="../" class="back-link">Back to demos</a>
+        <div class="navil-title">
+          <p>Navil network demo</p>
+          <h1 id="book-title">Loading</h1>
+        </div>
+        <div class="navil-actions">
+          <button id="load-vector-subgraph" type="button">Vector subgraph</button>
+          <button id="load-navil-subgraph" type="button">Navil layout subgraph</button>
+          <button id="load-navil-strong-subgraph" type="button">Strong links</button>
+          <button id="load-navil-anchor-subgraph" type="button">Root anchor</button>
+          <button id="load-navil-anchor-strong-subgraph" type="button">Anchor + strong</button>
+          <button id="load-navil-demo-params-subgraph" type="button">Demo params</button>
+          <button id="whole-graph" type="button">Whole graph</button>
+          <button id="collapse-all" type="button">Chapters</button>
+          <button id="expand-all" type="button">Expand all</button>
+          <button id="reset-view" type="button">Reset</button>
+        </div>
+      </header>
+
+      <section id="status-panel" class="status-panel" aria-live="polite">
+        <p class="status-title">Loading WASM and Navil snapshot...</p>
+        <p class="status-body">Run the Navi WASM server from the submodule if this page is opened directly.</p>
+      </section>
+
+      <section class="navil-layout">
+        <aside class="toc-panel" aria-label="Table of contents">
+          <div class="toc-head">
+            <span>Contents</span>
+            <strong id="visible-count">0 / 0</strong>
+          </div>
+          <div class="toc-list" id="toc-list"></div>
+        </aside>
+
+        <section class="graph-panel">
+          <div class="graph-head">
+            <div class="metric">
+              <span>Visible</span>
+              <strong id="metric-visible">0</strong>
+            </div>
+            <div class="metric">
+              <span>Edges</span>
+              <strong id="metric-edges">0</strong>
+            </div>
+            <div class="metric">
+              <span>Pages</span>
+              <strong id="metric-pages">0-0</strong>
+            </div>
+            <div class="metric">
+              <span>Path stages</span>
+              <strong id="metric-stages">0</strong>
+            </div>
+          </div>
+          <div class="canvas-frame">
+            <canvas id="network-canvas"></canvas>
+          </div>
+        </section>
+
+        <aside class="details-panel" aria-live="polite">
+          <div id="node-details"></div>
+        </aside>
+      </section>
+    </main>
+  </body>
+</html>
