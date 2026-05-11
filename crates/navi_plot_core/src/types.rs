@@ -571,6 +571,9 @@ pub struct NetworkPlotSpec {
     /// or pre-scale all canvas-space values manually for legacy callers.
     #[serde(default = "default_pixel_ratio")]
     pub pixel_ratio: f64,
+    /// Optional presentation motion for hierarchy/radial network layouts.
+    #[serde(default)]
+    pub motion: Option<NetworkMotionSpec>,
 }
 
 /// Camera state for a network graph session.
@@ -589,6 +592,35 @@ pub struct NetworkView {
 pub struct NetworkLayoutPoint {
     pub x: f64,
     pub y: f64,
+}
+
+/// Optional render-time motion applied to hierarchy/radial network layouts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct NetworkMotionSpec {
+    /// Enable or disable motion. Defaults to true when a motion object is present.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Motion shape. V1 supports deterministic orbital, drift, and breathe motion.
+    #[serde(default)]
+    pub mode: NetworkMotionMode,
+    /// Maximum visual drift in canvas pixels. Default: 12.
+    #[serde(default = "default_network_motion_amplitude")]
+    pub amplitude: f64,
+    /// Motion cycles per second. Default: 0.18.
+    #[serde(default = "default_network_motion_speed")]
+    pub speed: f64,
+    /// Optional deterministic seed for the per-node phases.
+    #[serde(default)]
+    pub seed: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum NetworkMotionMode {
+    #[default]
+    Orbital,
+    Drift,
+    Breathe,
 }
 
 /// Focus behavior for computing a target camera view.
@@ -704,4 +736,12 @@ fn default_network_focus_padding() -> f64 {
 
 fn default_network_focus_min_world_span() -> f64 {
     160.0
+}
+
+fn default_network_motion_amplitude() -> f64 {
+    12.0
+}
+
+fn default_network_motion_speed() -> f64 {
+    0.18
 }

@@ -1,9 +1,9 @@
 use super::*;
-use crate::node::ResolvedNodeMediaKind;
+use crate::node::{GraphNodeRenderInfo, ResolvedNodeMediaKind};
 use crate::types::{
     BuiltinNodeIcon, GraphEdgeStyle, GraphNodeStyle, NetworkEdge, NetworkLayoutPoint,
-    NetworkNode, NetworkPlotSpec, NetworkView, NodeMedia, NodeMediaFit, NodeMediaKind, NodeShape,
-    SelectionStyle,
+    NetworkMotionMode, NetworkMotionSpec, NetworkNode, NetworkPlotSpec, NetworkView, NodeMedia,
+    NodeMediaFit, NodeMediaKind, NodeShape, SelectionStyle,
 };
 use plotters::drawing::IntoDrawingArea;
 use plotters_svg::SVGBackend;
@@ -95,6 +95,7 @@ fn sample_spec() -> NetworkPlotSpec {
         show_arrows: true,
         show_labels: true,
         pixel_ratio: 1.0,
+        motion: None,
     }
 }
 

@@ -115,7 +115,14 @@ fn network_subgraph_keeps_only_included_nodes_and_induced_edges() {
 
     let filtered = create_network_subgraph(&spec, vec!["a".to_string(), "b".to_string()]).unwrap();
 
-    assert_eq!(filtered.nodes.iter().map(|node| node.id.as_str()).collect::<Vec<_>>(), vec!["a", "b"]);
+    assert_eq!(
+        filtered
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["a", "b"]
+    );
     assert_eq!(
         filtered
             .edges

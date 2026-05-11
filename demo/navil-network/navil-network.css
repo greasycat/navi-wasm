@@ -286,6 +286,10 @@ body.navil-network-body {
   cursor: grabbing;
 }
 
+.canvas-frame canvas.is-rotating {
+  cursor: move;
+}
+
 .details-panel {
   padding: 14px;
   overflow: auto;

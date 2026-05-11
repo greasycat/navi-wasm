@@ -36,6 +36,7 @@ pub(in crate::network) fn validate(spec: &NetworkPlotSpec) -> Result<(), PlotErr
         }
     }
 
+    validate_motion(spec)?;
     resolve_nodes(spec)?;
     let _ = resolve_selection_style(SELECTION_RING_PADDING, spec.selection_style.as_ref())?;
     for edge in &spec.edges {

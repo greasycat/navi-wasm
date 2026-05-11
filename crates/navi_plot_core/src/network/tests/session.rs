@@ -55,6 +55,41 @@ fn network_session_exposes_layout_snapshot() {
 }
 
 #[test]
+fn network_session_rotate_about_canvas_anchor_updates_layout_and_picking() {
+    let mut session = NetworkSession::new(positioned_spec()).unwrap();
+    session
+        .set_view(NetworkView {
+            zoom: 1.2,
+            translate_x: 50.0,
+            translate_y: -20.0,
+        })
+        .unwrap();
+
+    let anchor = session.layout["a"];
+    let anchor_canvas_x = anchor.0 * 1.2 + 50.0;
+    let anchor_canvas_y = anchor.1 * 1.2 - 20.0;
+    session
+        .rotate_about(
+            anchor_canvas_x,
+            anchor_canvas_y,
+            std::f64::consts::FRAC_PI_2,
+        )
+        .unwrap();
+
+    assert!((session.layout["a"].0 - anchor.0).abs() < 0.001);
+    assert!((session.layout["a"].1 - anchor.1).abs() < 0.001);
+    assert!((session.layout["b"].0 - 0.0).abs() < 0.001);
+    assert!((session.layout["b"].1 - 300.0).abs() < 0.001);
+
+    let b_canvas_x = session.layout["b"].0 * 1.2 + 50.0;
+    let b_canvas_y = session.layout["b"].1 * 1.2 - 20.0;
+    assert_eq!(
+        session.pick_node(b_canvas_x, b_canvas_y),
+        Some("b".to_string())
+    );
+}
+
+#[test]
 fn network_session_update_can_restore_cached_target_layout() {
     let spec = positioned_spec();
     let mut session = NetworkSession::new(spec.clone()).unwrap();
@@ -257,8 +292,14 @@ fn network_topology_transition_anchors_new_branch_to_parent() {
         &previous_ids,
         0.5,
     );
-    let section = transition_node_frame("section", transition, &session.layout, section_anchor_frame, 0.5)
-        .expect("new node frame");
+    let section = transition_node_frame(
+        "section",
+        transition,
+        &session.layout,
+        section_anchor_frame,
+        0.5,
+    )
+    .expect("new node frame");
     let chapter_from = transition.from_layout["chapter"];
     let section_to = session.layout["section"];
     let expected_x = chapter_from.0 + (section_to.0 - chapter_from.0) * 0.5;
@@ -418,8 +459,14 @@ fn network_topology_transition_anchors_each_new_branch_to_its_local_parent() {
         &previous_ids,
         0.5,
     );
-    let left_leaf = transition_node_frame("left-leaf", transition, &session.layout, left_anchor_frame, 0.5)
-        .expect("left leaf frame");
+    let left_leaf = transition_node_frame(
+        "left-leaf",
+        transition,
+        &session.layout,
+        left_anchor_frame,
+        0.5,
+    )
+    .expect("left leaf frame");
     let right_anchor_frame = transition_node_anchor_frame(
         "right-leaf",
         transition,
@@ -430,8 +477,14 @@ fn network_topology_transition_anchors_each_new_branch_to_its_local_parent() {
         &previous_ids,
         0.5,
     );
-    let right_leaf = transition_node_frame("right-leaf", transition, &session.layout, right_anchor_frame, 0.5)
-        .expect("right leaf frame");
+    let right_leaf = transition_node_frame(
+        "right-leaf",
+        transition,
+        &session.layout,
+        right_anchor_frame,
+        0.5,
+    )
+    .expect("right leaf frame");
 
     let left_from = transition.from_layout["left"];
     let right_from = transition.from_layout["right"];
@@ -756,4 +809,190 @@ fn network_session_collapse_restores_parent_distance() {
 
     assert!((expanded_distance - collapsed_distance).abs() < WORLD_NODE_SPACING * 0.1);
     assert!((restored_distance - collapsed_distance).abs() < 10.0);
+}
+
+fn radial_motion_spec(amplitude: f64, speed: f64) -> NetworkPlotSpec {
+    radial_motion_spec_with_mode(NetworkMotionMode::Orbital, amplitude, speed)
+}
+
+fn radial_motion_spec_with_mode(
+    mode: NetworkMotionMode,
+    amplitude: f64,
+    speed: f64,
+) -> NetworkPlotSpec {
+    NetworkPlotSpec {
+        nodes: vec![
+            NetworkNode {
+                id: "root".to_string(),
+                label: "Root".to_string(),
+                color: None,
+                x: Some(0.0),
+                y: Some(0.0),
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "child".to_string(),
+                label: "Child".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: None,
+                properties: Default::default(),
+            },
+            NetworkNode {
+                id: "grandchild".to_string(),
+                label: "Grandchild".to_string(),
+                color: None,
+                x: None,
+                y: None,
+                shape: None,
+                label_inside: None,
+                style: None,
+                media: None,
+                force_layers: None,
+                properties: Default::default(),
+            },
+        ],
+        edges: vec![
+            NetworkEdge {
+                source: "root".to_string(),
+                target: "child".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "child".to_string(),
+                target: "grandchild".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+        ],
+        motion: Some(NetworkMotionSpec {
+            enabled: true,
+            mode,
+            amplitude,
+            speed,
+            seed: 7,
+        }),
+        ..sample_spec()
+    }
+}
+
+fn render_info<'a>(nodes: &'a [GraphNodeRenderInfo], id: &str) -> &'a GraphNodeRenderInfo {
+    nodes
+        .iter()
+        .find(|node| node.id == id)
+        .expect("render info exists")
+}
+
+#[test]
+fn network_motion_modes_animate_radial_nodes_without_mutating_layout() {
+    for mode in [
+        NetworkMotionMode::Orbital,
+        NetworkMotionMode::Drift,
+        NetworkMotionMode::Breathe,
+    ] {
+        let session =
+            NetworkSession::new(radial_motion_spec_with_mode(mode.clone(), 24.0, 0.5)).unwrap();
+        let base_layout = session.layout.clone();
+        let first = session.animated_layout(0.0).unwrap();
+        let second = session.animated_layout(0.75).unwrap();
+        let third = session.animated_layout(1.5).unwrap();
+
+        assert_eq!(session.layout, base_layout);
+        assert_eq!(base_layout["root"], first["root"]);
+        if matches!(mode, NetworkMotionMode::Breathe) {
+            let root = base_layout["root"];
+            let base_child_radius =
+                (base_layout["child"].0 - root.0).hypot(base_layout["child"].1 - root.1);
+            let first_child_radius = (first["child"].0 - root.0).hypot(first["child"].1 - root.1);
+            let second_child_radius =
+                (second["child"].0 - root.0).hypot(second["child"].1 - root.1);
+            let first_angle = (first["child"].1 - root.1).atan2(first["child"].0 - root.0);
+            let second_angle = (second["child"].1 - root.1).atan2(second["child"].0 - root.0);
+            let third_angle = (third["child"].1 - root.1).atan2(third["child"].0 - root.0);
+            let first_delta = second_angle - first_angle;
+            let second_delta = third_angle - second_angle;
+            assert_ne!(first["child"], second["child"]);
+            assert!((first_child_radius - base_child_radius).abs() < 0.001);
+            assert!((second_child_radius - base_child_radius).abs() < 0.001);
+            assert!(first_delta * second_delta > 0.0);
+            assert_ne!(first["grandchild"], second["grandchild"]);
+        } else {
+            assert_ne!(first["child"], second["child"]);
+        }
+    }
+}
+
+#[test]
+fn network_motion_is_ignored_for_non_radial_layouts() {
+    let spec = NetworkPlotSpec {
+        edges: vec![
+            NetworkEdge {
+                source: "a".to_string(),
+                target: "b".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "b".to_string(),
+                target: "c".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+            NetworkEdge {
+                source: "c".to_string(),
+                target: "a".to_string(),
+                label: None,
+                color: None,
+                weight: Some(1.0),
+                style: None,
+            },
+        ],
+        motion: Some(NetworkMotionSpec {
+            enabled: true,
+            mode: NetworkMotionMode::Orbital,
+            amplitude: 24.0,
+            speed: 0.5,
+            seed: 3,
+        }),
+        ..sample_spec()
+    };
+    let session = NetworkSession::new(spec).unwrap();
+
+    assert!(session.radial_hierarchy.is_none());
+    assert_eq!(session.render_nodes(), session.render_motion_nodes(1.25));
+}
+
+#[test]
+fn network_motion_pick_uses_animated_position() {
+    let session = NetworkSession::new(radial_motion_spec(80.0, 0.4)).unwrap();
+    let time_seconds = 0.25;
+    let animated_nodes = session.render_motion_nodes(time_seconds);
+    let child = render_info(&animated_nodes, "child");
+
+    let hit = session.pick_node_motion(
+        f64::from(child.center_x),
+        f64::from(child.center_y),
+        time_seconds,
+    );
+
+    assert_eq!(hit.as_deref(), Some("child"));
 }

@@ -100,7 +100,9 @@ pub(crate) fn update_network_session_with_layout_cache(
 }
 
 pub(crate) fn get_network_layout_session(handle: u32) -> Result<JsValue, JsValue> {
-    with_network_session_mut(handle, |entry| to_js_value(&entry.session.layout_snapshot()))
+    with_network_session_mut(handle, |entry| {
+        to_js_value(&entry.session.layout_snapshot())
+    })
 }
 
 pub(crate) fn render_network_session(handle: u32) -> Result<(), JsValue> {
@@ -112,6 +114,22 @@ pub(crate) fn render_network_session(handle: u32) -> Result<(), JsValue> {
         )?;
         entry.session.render_on(root).map_err(plot_error_to_js)?;
         let nodes = entry.session.render_nodes();
+        overlay_graph_images(&entry.canvas_id, &nodes)
+    })
+}
+
+pub(crate) fn render_network_motion_session(handle: u32, time_seconds: f64) -> Result<(), JsValue> {
+    with_network_session_mut(handle, |entry| {
+        let root = drawing_area(
+            &entry.canvas_id,
+            entry.session.width(),
+            entry.session.height(),
+        )?;
+        entry
+            .session
+            .render_motion_on(root, time_seconds)
+            .map_err(plot_error_to_js)?;
+        let nodes = entry.session.render_motion_nodes(time_seconds);
         overlay_graph_images(&entry.canvas_id, &nodes)
     })
 }
@@ -136,6 +154,20 @@ pub(crate) fn pan_network_session(handle: u32, delta_x: f64, delta_y: f64) -> Re
     with_network_session_mut(handle, |entry| {
         entry.session.pan(delta_x, delta_y);
         Ok(())
+    })
+}
+
+pub(crate) fn rotate_network_session(
+    handle: u32,
+    canvas_x: f64,
+    canvas_y: f64,
+    angle_radians: f64,
+) -> Result<(), JsValue> {
+    with_network_session_mut(handle, |entry| {
+        entry
+            .session
+            .rotate_about(canvas_x, canvas_y, angle_radians)
+            .map_err(plot_error_to_js)
     })
 }
 
@@ -164,6 +196,20 @@ pub(crate) fn pick_network_node_session(
     })
 }
 
+pub(crate) fn pick_network_node_motion_session(
+    handle: u32,
+    canvas_x: f64,
+    canvas_y: f64,
+    time_seconds: f64,
+) -> Result<JsValue, JsValue> {
+    with_network_session_mut(handle, |entry| {
+        let hit = entry
+            .session
+            .pick_node_motion(canvas_x, canvas_y, time_seconds);
+        to_js_value(&hit.map(|node_id| NetworkHit { node_id }))
+    })
+}
+
 pub(crate) fn pick_network_hit_session(
     handle: u32,
     canvas_x: f64,
@@ -173,6 +219,21 @@ pub(crate) fn pick_network_hit_session(
         let hit = entry
             .session
             .pick(canvas_x, canvas_y)
+            .map(to_network_badge_hit);
+        to_js_value(&hit)
+    })
+}
+
+pub(crate) fn pick_network_hit_motion_session(
+    handle: u32,
+    canvas_x: f64,
+    canvas_y: f64,
+    time_seconds: f64,
+) -> Result<JsValue, JsValue> {
+    with_network_session_mut(handle, |entry| {
+        let hit = entry
+            .session
+            .pick_motion(canvas_x, canvas_y, time_seconds)
             .map(to_network_badge_hit);
         to_js_value(&hit)
     })

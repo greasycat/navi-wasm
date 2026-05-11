@@ -57,12 +57,19 @@ fn network_relaxation_only_uses_nodes_in_the_same_force_layer() {
         edges: vec![],
         ..sample_spec()
     };
-    let mut positions = vec![(-WORLD_NODE_SPACING, 0.0), (WORLD_NODE_SPACING, 0.0), (0.0, 0.0)];
+    let mut positions = vec![
+        (-WORLD_NODE_SPACING, 0.0),
+        (WORLD_NODE_SPACING, 0.0),
+        (0.0, 0.0),
+    ];
     let movable = vec![false, false, true];
 
     relax_positions(&spec, &mut positions, &movable, 8);
 
-    assert!(positions[2].0 > 0.0, "center node should only be repelled by the left node");
+    assert!(
+        positions[2].0 > 0.0,
+        "center node should only be repelled by the left node"
+    );
 }
 
 #[test]

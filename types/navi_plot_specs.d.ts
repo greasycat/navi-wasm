@@ -354,6 +354,8 @@ export interface NetworkPlotSpec {
   show_arrows?: boolean;
   /** Draw node labels. Default: true */
   show_labels?: boolean;
+  /** Optional presentation motion for hierarchy/radial network layouts. Disabled by default. */
+  motion?: NetworkMotionSpec | null;
 }
 
 export interface NetworkView {
@@ -365,6 +367,21 @@ export interface NetworkView {
 export interface NetworkLayoutPoint {
   x: number;
   y: number;
+}
+
+export type NetworkMotionMode = "orbital" | "drift" | "breathe";
+
+export interface NetworkMotionSpec {
+  /** Defaults to true when a motion object is present. */
+  enabled?: boolean;
+  /** V1 supports deterministic orbital, drift, and breathe motion. Default: "orbital" */
+  mode?: NetworkMotionMode | null;
+  /** Maximum visual drift in canvas pixels. Default: 12 */
+  amplitude?: number;
+  /** Motion cycles per second. Default: 0.18 */
+  speed?: number;
+  /** Optional deterministic seed for per-node phases. Default: 0 */
+  seed?: number;
 }
 
 export type NetworkFocusMode = "node_and_neighbors";

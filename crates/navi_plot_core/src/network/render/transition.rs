@@ -60,14 +60,16 @@ pub(in crate::network) fn transition_node_anchor_frame(
     let to_present = to_layout.contains_key(node_id);
 
     if !from_present && to_present {
-        if let Some(anchor_id) = nearest_shared_ancestor(current_parent_by_id, previous_ids, node_id)
+        if let Some(anchor_id) =
+            nearest_shared_ancestor(current_parent_by_id, previous_ids, node_id)
         {
             return transition_anchor_frame_for_id(transition, to_layout, &anchor_id, progress);
         }
     }
 
     if from_present && !to_present {
-        if let Some(anchor_id) = nearest_shared_ancestor(previous_parent_by_id, current_ids, node_id)
+        if let Some(anchor_id) =
+            nearest_shared_ancestor(previous_parent_by_id, current_ids, node_id)
         {
             return transition_anchor_frame_for_id(transition, to_layout, &anchor_id, progress);
         }
@@ -192,9 +194,13 @@ where
             &previous_ids,
             progress,
         );
-        let Some(source_state) =
-            transition_node_frame(&source_id, transition, layout, source_anchor_frame, progress)
-        else {
+        let Some(source_state) = transition_node_frame(
+            &source_id,
+            transition,
+            layout,
+            source_anchor_frame,
+            progress,
+        ) else {
             continue;
         };
         let target_anchor_frame = transition_node_anchor_frame(
@@ -207,9 +213,13 @@ where
             &previous_ids,
             progress,
         );
-        let Some(target_state) =
-            transition_node_frame(&target_id, transition, layout, target_anchor_frame, progress)
-        else {
+        let Some(target_state) = transition_node_frame(
+            &target_id,
+            transition,
+            layout,
+            target_anchor_frame,
+            progress,
+        ) else {
             continue;
         };
         let edge_alpha = transition_phase_opacity(from_edge.is_some(), to_edge.is_some(), progress)
@@ -311,7 +321,9 @@ where
                 .as_deref()
                 .filter(|label| !label.is_empty())
             {
-                let label_size = (18.0 * spec.pixel_ratio.max(0.25) * view.zoom).round().max(1.0) as u32;
+                let label_size = (18.0 * spec.pixel_ratio.max(0.25) * view.zoom)
+                    .round()
+                    .max(1.0) as u32;
                 let label_color = edge_style.label_color.unwrap_or(edge_style.stroke_color);
                 let text_color = label_color.mix(edge_style.opacity * edge_alpha);
                 let text_style = TextStyle::from(

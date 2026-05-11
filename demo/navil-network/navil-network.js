@@ -7,6 +7,30 @@ const EXPANDED_PROPERTY_KEY = "navil_expanded";
 const HIERARCHY_EDGE_WEIGHT = 1.0;
 const EXPANDED_PARENT_EDGE_WEIGHT = 0.65;
 const SIBLING_EDGE_WEIGHT = 0.15;
+const MOTION_AMPLITUDE = 12;
+const MOTION_SPEED = 0.18;
+const MAX_MOTION_DELTA_SECONDS = 1 / 30;
+const TAU = Math.PI * 2;
+const MOTION_HASH_OFFSET = 14695981039346656037n;
+const MOTION_HASH_PRIME = 1099511628211n;
+const MOTION_HASH_MASK = (1n << 64n) - 1n;
+const MOTION_UNIT_MASK = (1n << 24n) - 1n;
+const MIN_ORBIT_RADIUS_SCALE = 0.72;
+const ORBIT_RADIUS_SCALE_RANGE = 0.28;
+const MIN_ORBIT_ELLIPSE_SCALE = 0.62;
+const ORBIT_ELLIPSE_SCALE_RANGE = 0.32;
+const MIN_ORBIT_SPEED_SCALE = 0.72;
+const ORBIT_SPEED_SCALE_RANGE = 0.56;
+const MIN_DRIFT_RADIUS_SCALE = 0.62;
+const DRIFT_RADIUS_SCALE_RANGE = 0.38;
+const MIN_DRIFT_SECONDARY_SPEED = 0.31;
+const DRIFT_SECONDARY_SPEED_RANGE = 0.36;
+const MIN_BREATHE_RADIUS_SCALE = 0.46;
+const BREATHE_RADIUS_SCALE_RANGE = 0.34;
+const BREATHE_PULSE_SCALE = 0.5;
+const BREATHE_BRANCH_ROTATION_SPEED_SCALE = 0.016;
+const USER_ROTATION_MIN_RADIUS = 90;
+const MOTION_MODES = new Set(["orbital", "drift", "breathe"]);
 
 const LEVEL_COLORS = ["#1d7a42", "#0891b2", "#7c3aed", "#d97706", "#dc2626"];
 const STAGE_COLORS = ["#0f766e", "#2563eb", "#7c3aed", "#d97706", "#a61b3f", "#4f46e5"];
@@ -74,7 +98,16 @@ const state = {
   expandedIds: new Set(),
   selectedNodeId: null,
   sessionHandle: null,
+  currentSpec: null,
+  currentLayout: null,
   transitionFrame: null,
+  motionEnabled: false,
+  motionMode: "breathe",
+  motionSeed: Math.floor(Math.random() * 0xffffffff),
+  motionFrame: null,
+  motionTimeSeconds: 0,
+  motionLastFrameMs: null,
+  motionParams: new Map(),
   pixelRatio: Math.max(1, Math.min(3, Math.round((window.devicePixelRatio || 1) * 2) / 2)),
   resizeFrame: null
 };
@@ -97,6 +130,8 @@ const dom = {
   loadNavilAnchorStrongSubgraph: document.getElementById("load-navil-anchor-strong-subgraph"),
   loadNavilDemoParamsSubgraph: document.getElementById("load-navil-demo-params-subgraph"),
   wholeGraph: document.getElementById("whole-graph"),
+  motionToggle: document.getElementById("motion-toggle"),
+  motionModeButtons: Array.from(document.querySelectorAll("[data-motion-mode]")),
   metricVisible: document.getElementById("metric-visible"),
   metricEdges: document.getElementById("metric-edges"),
   metricPages: document.getElementById("metric-pages"),
@@ -162,6 +197,17 @@ function componentColor(component) {
   return ROLE_COLORS[component.role] ?? "#64748b";
 }
 
+function motionSpec() {
+  if (!state.motionEnabled) return undefined;
+  return {
+    enabled: true,
+    mode: state.motionMode,
+    amplitude: scale(MOTION_AMPLITUDE, 1),
+    speed: MOTION_SPEED,
+    seed: state.motionSeed
+  };
+}
+
 function scale(value, minimum = 0) {
   if (value == null) return value;
   return Math.max(minimum, Math.round(value * state.pixelRatio));
@@ -200,6 +246,445 @@ function formatRelevance(entry) {
 
 function easeInOutCubic(t) {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+}
+
+function cssColor(color, opacity = 1) {
+  const alpha = clamp01(opacity);
+  if (!color || typeof color !== "string") return `rgba(0,0,0,${alpha})`;
+  const value = color.trim();
+  if (!value.startsWith("#")) return value;
+  const hex = value.slice(1);
+  const expanded = hex.length === 3
+    ? hex.split("").map((char) => `${char}${char}`).join("")
+    : hex;
+  if (expanded.length !== 6) return value;
+  const red = Number.parseInt(expanded.slice(0, 2), 16);
+  const green = Number.parseInt(expanded.slice(2, 4), 16);
+  const blue = Number.parseInt(expanded.slice(4, 6), 16);
+  if (![red, green, blue].every(Number.isFinite)) return value;
+  return `rgba(${red},${green},${blue},${alpha})`;
+}
+
+function finiteNumber(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function resolveNodeStyleForCanvas(spec, node) {
+  const graph = spec.default_node_style ?? {};
+  const item = node.style ?? {};
+  const labelInside = item.label_inside ?? node.label_inside ?? graph.label_inside ?? false;
+  const fillColor = item.fill_color ?? node.color ?? graph.fill_color ?? "#3b82f6";
+  return {
+    fillColor,
+    strokeColor: item.stroke_color ?? graph.stroke_color ?? fillColor,
+    strokeWidth: finiteNumber(item.stroke_width ?? graph.stroke_width, 0),
+    radius: Math.max(1, finiteNumber(item.radius ?? graph.radius ?? spec.node_radius, 16)),
+    opacity: clamp01(item.opacity ?? graph.opacity ?? 1),
+    shape: item.shape ?? node.shape ?? graph.shape ?? "circle",
+    labelVisible: item.label_visible ?? graph.label_visible ?? spec.show_labels !== false,
+    labelColor: item.label_color ?? graph.label_color ?? (labelInside ? "#ffffff" : "#000000"),
+    labelInside,
+    shadowColor: item.shadow_color ?? graph.shadow_color ?? null,
+    shadowBlur: finiteNumber(item.shadow_blur ?? graph.shadow_blur, 0),
+    shadowOffsetX: finiteNumber(item.shadow_offset_x ?? graph.shadow_offset_x, 0),
+    shadowOffsetY: finiteNumber(item.shadow_offset_y ?? graph.shadow_offset_y, 0),
+    shadowOpacity: clamp01(item.shadow_opacity ?? graph.shadow_opacity ?? 0.28)
+  };
+}
+
+function resolveEdgeStyleForCanvas(spec, edge) {
+  const graph = spec.default_edge_style ?? {};
+  const item = edge.style ?? {};
+  return {
+    strokeColor: item.stroke_color ?? edge.color ?? graph.stroke_color ?? "#6b7280",
+    strokeWidth: Math.max(0, finiteNumber(item.stroke_width ?? graph.stroke_width, 1)),
+    opacity: clamp01(item.opacity ?? graph.opacity ?? 1),
+    dashPattern: item.dash_pattern ?? graph.dash_pattern ?? null
+  };
+}
+
+function resolveSelectionStyleForCanvas(spec) {
+  const style = spec.selection_style ?? {};
+  return {
+    strokeColor: style.stroke_color ?? "#000000",
+    strokeWidth: Math.max(0, finiteNumber(style.stroke_width, 2)),
+    padding: Math.max(0, finiteNumber(style.padding, 5)),
+    opacity: clamp01(style.opacity ?? 0.9)
+  };
+}
+
+function scaleNodeStyleForCanvas(style, zoom) {
+  const scale = Math.max(0.001, zoom || 1);
+  return {
+    ...style,
+    radius: Math.max(1, style.radius * scale),
+    strokeWidth: style.strokeWidth * scale,
+    shadowBlur: style.shadowBlur * scale,
+    shadowOffsetX: style.shadowOffsetX * scale,
+    shadowOffsetY: style.shadowOffsetY * scale
+  };
+}
+
+function scaleSelectionStyleForCanvas(style, zoom) {
+  const scale = Math.max(0.001, zoom || 1);
+  return {
+    ...style,
+    strokeWidth: style.strokeWidth * scale,
+    padding: style.padding * scale
+  };
+}
+
+function structuralParentMap(spec) {
+  const parents = new Map();
+  for (const edge of spec.edges) {
+    if ((edge.weight ?? 1) >= 0.5 && !parents.has(edge.target)) {
+      parents.set(edge.target, edge.source);
+    }
+  }
+  return parents;
+}
+
+function hasRadialHierarchy(spec) {
+  const nodeIds = new Set(spec.nodes.map((node) => node.id));
+  const targets = new Set();
+  for (const edge of spec.edges) {
+    if ((edge.weight ?? 1) >= 0.5 && nodeIds.has(edge.source) && nodeIds.has(edge.target)) {
+      targets.add(edge.target);
+    }
+  }
+  let roots = 0;
+  for (const id of nodeIds) {
+    if (!targets.has(id)) roots += 1;
+  }
+  return roots === 1;
+}
+
+function structuralRootId(spec, parentById = structuralParentMap(spec)) {
+  const nodeIds = new Set(spec.nodes.map((node) => node.id));
+  const roots = [];
+  for (const id of nodeIds) {
+    if (!parentById.has(id)) roots.push(id);
+  }
+  return roots.length === 1 ? roots[0] : null;
+}
+
+function rotateLeft64(value, bits) {
+  const shift = BigInt(bits);
+  return ((value << shift) | (value >> (64n - shift))) & MOTION_HASH_MASK;
+}
+
+function motionHash(nodeId, seed) {
+  const seedValue = typeof seed === "bigint" ? seed : BigInt(seed ?? 0);
+  let hash = (MOTION_HASH_OFFSET ^ seedValue) & MOTION_HASH_MASK;
+  for (let index = 0; index < nodeId.length; index += 1) {
+    hash ^= BigInt(nodeId.charCodeAt(index) & 0xff);
+    hash = (hash * MOTION_HASH_PRIME) & MOTION_HASH_MASK;
+  }
+  return hash;
+}
+
+function unitFromMotionHash(hash) {
+  return Number(hash & MOTION_UNIT_MASK) / Number(MOTION_UNIT_MASK);
+}
+
+function firstLevelBranchId(nodeId, parentById, rootId) {
+  let current = nodeId;
+  while (parentById.has(current)) {
+    const parent = parentById.get(current);
+    if (parent === rootId) return current;
+    current = parent;
+  }
+  return null;
+}
+
+function breatheBranchRotationAngle(motion, timeSeconds) {
+  if (!motion?.enabled) return 0;
+  const directionSeed = motionHash("breathe:rotation-direction", motion.seed ?? 0);
+  const direction = (directionSeed & 1n) === 0n ? 1 : -1;
+  return timeSeconds * motion.speed * BREATHE_BRANCH_ROTATION_SPEED_SCALE * TAU * direction;
+}
+
+function rotatePointAround(origin, point, angle) {
+  if (!origin || !point || Math.abs(angle) <= Number.EPSILON) return point;
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return {
+    x: origin.x + dx * cos - dy * sin,
+    y: origin.y + dx * sin + dy * cos
+  };
+}
+
+function motionParamsForNode(nodeId, seed) {
+  const key = `${seed ?? 0}:${nodeId}`;
+  const cached = state.motionParams.get(key);
+  if (cached) return cached;
+  const hash = motionHash(nodeId, seed);
+  const params = {
+    basePhase: unitFromMotionHash(hash) * TAU,
+    secondaryPhase: unitFromMotionHash(rotateLeft64(hash, 11)) * TAU,
+    speedScale: MIN_ORBIT_SPEED_SCALE + unitFromMotionHash(rotateLeft64(hash, 7)) * ORBIT_SPEED_SCALE_RANGE,
+    secondarySpeed: MIN_DRIFT_SECONDARY_SPEED + unitFromMotionHash(rotateLeft64(hash, 23)) * DRIFT_SECONDARY_SPEED_RANGE,
+    direction: (hash & (1n << 63n)) === 0n ? 1 : -1,
+    radiusScale: MIN_ORBIT_RADIUS_SCALE + unitFromMotionHash(rotateLeft64(hash, 17)) * ORBIT_RADIUS_SCALE_RANGE,
+    driftRadiusScale: MIN_DRIFT_RADIUS_SCALE + unitFromMotionHash(rotateLeft64(hash, 17)) * DRIFT_RADIUS_SCALE_RANGE,
+    breatheRadiusScale: MIN_BREATHE_RADIUS_SCALE + unitFromMotionHash(rotateLeft64(hash, 17)) * BREATHE_RADIUS_SCALE_RANGE,
+    ellipseScale: MIN_ORBIT_ELLIPSE_SCALE + unitFromMotionHash(rotateLeft64(hash, 31)) * ORBIT_ELLIPSE_SCALE_RANGE,
+    tilt: unitFromMotionHash(rotateLeft64(hash, 43)) * TAU
+  };
+  state.motionParams.set(key, params);
+  return params;
+}
+
+function motionOffsetForNode(nodeId, motion, view, timeSeconds, point, rootPoint) {
+  if (!motion?.enabled || motion.amplitude <= 0) return { x: 0, y: 0 };
+  const visualAmplitude = motion.amplitude / Math.max(0.001, view.zoom || 1);
+  const params = motionParamsForNode(nodeId, motion.seed ?? 0);
+
+  if (motion.mode === "drift") {
+    const phase = params.basePhase + timeSeconds * motion.speed * params.speedScale * TAU;
+    const secondary = params.secondaryPhase + timeSeconds * motion.speed * params.secondarySpeed * TAU;
+    const localX = (Math.sin(phase) * 0.74 + Math.sin(secondary) * 0.26) * visualAmplitude * params.driftRadiusScale;
+    const localY =
+      (Math.cos(phase) * 0.58 + Math.sin(secondary * 1.31) * 0.42) * visualAmplitude * params.driftRadiusScale;
+    return {
+      x: localX * Math.cos(params.tilt) - localY * Math.sin(params.tilt),
+      y: localX * Math.sin(params.tilt) + localY * Math.cos(params.tilt)
+    };
+  }
+
+  if (motion.mode === "breathe") {
+    let ux = Math.cos(params.tilt);
+    let uy = Math.sin(params.tilt);
+    if (rootPoint && point) {
+      const dx = point.x - rootPoint.x;
+      const dy = point.y - rootPoint.y;
+      const length = Math.hypot(dx, dy);
+      if (length > 0.01) {
+        ux = dx / length;
+        uy = dy / length;
+      }
+    }
+    const speedScale = 0.76 + (params.speedScale - MIN_ORBIT_SPEED_SCALE) / ORBIT_SPEED_SCALE_RANGE * 0.18;
+    const phase = params.basePhase + timeSeconds * motion.speed * speedScale * TAU;
+    const amount = Math.sin(phase) * visualAmplitude * params.breatheRadiusScale * BREATHE_PULSE_SCALE;
+    return { x: ux * amount, y: uy * amount };
+  }
+
+  const phase = params.basePhase + timeSeconds * motion.speed * params.speedScale * TAU * params.direction;
+  const localX = Math.cos(phase) * visualAmplitude * params.radiusScale;
+  const localY = Math.sin(phase) * visualAmplitude * params.radiusScale * params.ellipseScale;
+  return {
+    x: localX * Math.cos(params.tilt) - localY * Math.sin(params.tilt),
+    y: localX * Math.sin(params.tilt) + localY * Math.cos(params.tilt)
+  };
+}
+
+function drawCanvasShape(ctx, shape, x, y, radius, mode) {
+  ctx.beginPath();
+  if (shape === "square") {
+    ctx.rect(x - radius, y - radius, radius * 2, radius * 2);
+  } else if (shape === "diamond") {
+    ctx.moveTo(x, y - radius);
+    ctx.lineTo(x + radius, y);
+    ctx.lineTo(x, y + radius);
+    ctx.lineTo(x - radius, y);
+    ctx.closePath();
+  } else {
+    ctx.arc(x, y, radius, 0, TAU);
+  }
+  if (mode === "stroke") {
+    ctx.stroke();
+  } else {
+    ctx.fill();
+  }
+}
+
+function drawCanvasNode(ctx, spec, node, frame, selectionStyle) {
+  const { x, y, style } = frame;
+  if (style.opacity <= 0) return;
+  const selected = spec.selected_node_id === node.id;
+
+  if (style.shadowColor && style.shadowOpacity > 0 && style.shadowBlur > 0) {
+    ctx.save();
+    ctx.shadowColor = cssColor(style.shadowColor, style.shadowOpacity);
+    ctx.shadowBlur = style.shadowBlur;
+    ctx.shadowOffsetX = style.shadowOffsetX;
+    ctx.shadowOffsetY = style.shadowOffsetY;
+    ctx.fillStyle = cssColor(style.fillColor, style.opacity);
+    drawCanvasShape(ctx, style.shape, x, y, style.radius, "fill");
+    ctx.restore();
+  }
+
+  if (selected && selectionStyle.strokeWidth > 0) {
+    ctx.save();
+    ctx.strokeStyle = cssColor(selectionStyle.strokeColor, selectionStyle.opacity);
+    ctx.lineWidth = selectionStyle.strokeWidth;
+    drawCanvasShape(ctx, style.shape, x, y, style.radius + selectionStyle.padding, "stroke");
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.fillStyle = cssColor(style.fillColor, style.opacity);
+  drawCanvasShape(ctx, style.shape, x, y, style.radius, "fill");
+  if (style.strokeWidth > 0) {
+    ctx.strokeStyle = cssColor(style.strokeColor, style.opacity);
+    ctx.lineWidth = style.strokeWidth;
+    drawCanvasShape(ctx, style.shape, x, y, style.radius, "stroke");
+  }
+  ctx.restore();
+
+  if (style.labelVisible && node.label) {
+    const fontScale = Math.max(0.25, (spec.pixel_ratio || 1) * (frame.view.zoom || 1));
+    const size = Math.round((style.labelInside ? 18 : 19) * fontScale);
+    ctx.save();
+    ctx.fillStyle = cssColor(style.labelColor, style.opacity);
+    ctx.font = `${size}px ${spec.font_family || "sans-serif"}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = style.labelInside ? "middle" : "top";
+    ctx.fillText(node.label, x, style.labelInside ? y : y + style.radius + 4);
+    ctx.restore();
+  }
+}
+
+function drawCanvasToggleBadge(ctx, spec, node, frame, parentFrame) {
+  if (node.properties?.[TOGGLEABLE_PROPERTY_KEY] !== "true") return;
+  const badgeRadius = Math.max(5, Math.min(8, Math.round(frame.style.radius * 0.28)));
+  const centerOffset = Math.max(frame.style.radius + badgeRadius, badgeRadius + 1);
+  let ux = 1;
+  let uy = 0;
+  if (parentFrame) {
+    const dx = frame.worldX - parentFrame.worldX;
+    const dy = frame.worldY - parentFrame.worldY;
+    const length = Math.hypot(dx, dy);
+    if (length > 0.01) {
+      ux = dx / length;
+      uy = dy / length;
+    }
+  }
+  const x = frame.x + ux * centerOffset;
+  const y = frame.y + uy * centerOffset;
+  const symbolHalf = Math.max(2, Math.min(5, Math.round(badgeRadius * 0.55)));
+  const expanded = node.properties?.[EXPANDED_PROPERTY_KEY] === "true";
+
+  ctx.save();
+  ctx.fillStyle = "rgba(148,163,184,0.96)";
+  ctx.beginPath();
+  ctx.arc(x, y, badgeRadius, 0, TAU);
+  ctx.fill();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = Math.max(1, Math.min(2, Math.round(badgeRadius * 0.35)));
+  ctx.beginPath();
+  ctx.moveTo(x - symbolHalf, y);
+  ctx.lineTo(x + symbolHalf, y);
+  if (!expanded) {
+    ctx.moveTo(x, y - symbolHalf);
+    ctx.lineTo(x, y + symbolHalf);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawCanvasMotionFrame(spec, layout, view, timeSeconds) {
+  if (!spec || !layout || !view || !hasRadialHierarchy(spec)) return false;
+  const ctx = dom.canvas.getContext("2d");
+  if (!ctx) return false;
+  const motion = spec.motion;
+  const selectionStyle = scaleSelectionStyleForCanvas(resolveSelectionStyleForCanvas(spec), view.zoom);
+  const parentById = structuralParentMap(spec);
+  const rootId = structuralRootId(spec, parentById) ?? ROOT_NODE_ID;
+  const frames = new Map();
+  const rootPoint = layout[rootId] ?? layout[ROOT_NODE_ID] ?? layout[spec.nodes[0]?.id];
+
+  for (let index = 0; index < spec.nodes.length; index += 1) {
+    const node = spec.nodes[index];
+    const point = layout[node.id];
+    if (!point) continue;
+    const isBreatheNode = motion?.mode === "breathe" && node.id !== rootId;
+    const branchId = isBreatheNode ? firstLevelBranchId(node.id, parentById, rootId) : null;
+    const isFirstLevelBreatheNode = branchId === node.id;
+    const rotatedPoint = isBreatheNode
+      ? rotatePointAround(
+          rootPoint,
+          point,
+          breatheBranchRotationAngle(motion, timeSeconds)
+        )
+      : point;
+    const offset = index === 0 || node.id === rootId || isFirstLevelBreatheNode
+      ? { x: 0, y: 0 }
+      : motionOffsetForNode(node.id, motion, view, timeSeconds, rotatedPoint, rootPoint);
+    const worldX = rotatedPoint.x + offset.x;
+    const worldY = rotatedPoint.y + offset.y;
+    const style = scaleNodeStyleForCanvas(resolveNodeStyleForCanvas(spec, node), view.zoom);
+    frames.set(node.id, {
+      node,
+      style,
+      view,
+      worldX,
+      worldY,
+      x: worldX * view.zoom + view.translate_x,
+      y: worldY * view.zoom + view.translate_y
+    });
+  }
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, dom.canvas.width, dom.canvas.height);
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, dom.canvas.width, dom.canvas.height);
+
+  if (spec.title) {
+    ctx.fillStyle = "#111827";
+    ctx.font = `${Math.round(20 * Math.max(0.25, spec.pixel_ratio || 1))}px ${spec.font_family || "sans-serif"}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(spec.title, spec.width / 2, Math.max(16, (spec.margin || 40) / 2));
+  }
+
+  ctx.lineCap = "round";
+  for (const edge of spec.edges) {
+    const source = frames.get(edge.source);
+    const target = frames.get(edge.target);
+    if (!source || !target) continue;
+    const style = resolveEdgeStyleForCanvas(spec, edge);
+    if (style.strokeWidth <= 0 || style.opacity <= 0) continue;
+    ctx.save();
+    ctx.strokeStyle = cssColor(style.strokeColor, style.opacity);
+    ctx.lineWidth = style.strokeWidth;
+    if (Array.isArray(style.dashPattern)) {
+      ctx.setLineDash(style.dashPattern.map((value) => Math.max(1, finiteNumber(value, 1))));
+    }
+    ctx.beginPath();
+    ctx.moveTo(source.x, source.y);
+    ctx.lineTo(target.x, target.y);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  for (const node of spec.nodes) {
+    const frame = frames.get(node.id);
+    if (!frame) continue;
+    const footprint = frame.style.radius + selectionStyle.padding + 48;
+    if (
+      frame.x + footprint < 0 ||
+      frame.y + footprint < 0 ||
+      frame.x - footprint > spec.width ||
+      frame.y - footprint > spec.height
+    ) {
+      continue;
+    }
+    drawCanvasNode(ctx, spec, node, frame, selectionStyle);
+    const parentFrame = frames.get(parentById.get(node.id));
+    drawCanvasToggleBadge(ctx, spec, node, frame, parentFrame);
+  }
+  ctx.restore();
+  return true;
 }
 
 function prepareData(data) {
@@ -572,6 +1057,69 @@ function eventPoint(event) {
   };
 }
 
+function refreshCurrentLayout() {
+  state.currentLayout = state.sessionHandle != null && typeof wasm.get_network_layout_session === "function"
+    ? wasm.get_network_layout_session(state.sessionHandle)
+    : null;
+  return state.currentLayout;
+}
+
+function graphRotationAnchorPoint() {
+  const fallback = {
+    x: dom.canvas.width / 2,
+    y: dom.canvas.height / 2
+  };
+  if (state.sessionHandle == null || !state.currentSpec || !state.currentLayout) {
+    return fallback;
+  }
+  if (typeof wasm.get_network_view_session !== "function") {
+    return fallback;
+  }
+
+  try {
+    const view = wasm.get_network_view_session(state.sessionHandle);
+    const parentById = structuralParentMap(state.currentSpec);
+    const rootId = structuralRootId(state.currentSpec, parentById) ?? ROOT_NODE_ID;
+    const rootPoint = state.currentLayout[rootId] ?? state.currentLayout[ROOT_NODE_ID];
+    if (!rootPoint || !view) return fallback;
+    return {
+      x: rootPoint.x * view.zoom + view.translate_x,
+      y: rootPoint.y * view.zoom + view.translate_y
+    };
+  } catch (error) {
+    console.error("[navil-network] rotation anchor failed", error);
+    return fallback;
+  }
+}
+
+function rotateGraphBy(deltaAngle, anchorPoint) {
+  if (!Number.isFinite(deltaAngle) || Math.abs(deltaAngle) <= Number.EPSILON) return;
+  if (state.sessionHandle == null || typeof wasm.rotate_network_session !== "function") return;
+  const anchor = anchorPoint ?? graphRotationAnchorPoint();
+  wasm.rotate_network_session(state.sessionHandle, anchor.x, anchor.y, deltaAngle);
+  refreshCurrentLayout();
+  renderNetworkFrame();
+}
+
+function rotationDeltaFromPointerDrag(anchorPoint, previousPoint, nextPoint) {
+  if (!anchorPoint || !previousPoint || !nextPoint) return 0;
+  const dx = nextPoint.x - previousPoint.x;
+  const dy = nextPoint.y - previousPoint.y;
+  if (dx === 0 && dy === 0) return 0;
+
+  const radiusX = (previousPoint.x + nextPoint.x) / 2 - anchorPoint.x;
+  const radiusY = (previousPoint.y + nextPoint.y) / 2 - anchorPoint.y;
+  const radius = Math.hypot(radiusX, radiusY);
+  if (!Number.isFinite(radius) || radius <= 0.001) return 0;
+
+  const tangentX = -radiusY / radius;
+  const tangentY = radiusX / radius;
+  const tangentialDistance = dx * tangentX + dy * tangentY;
+  const effectiveRadius = Math.max(radius, scale(USER_ROTATION_MIN_RADIUS, 1));
+  const deltaAngle = tangentialDistance / effectiveRadius;
+  return Number.isFinite(deltaAngle) ? deltaAngle : 0;
+}
+
 function buildSpec() {
   if (isNavilLayoutSubgraph()) {
     return buildNavilLayoutSubgraphSpec();
@@ -742,7 +1290,8 @@ function buildSpec() {
     selected_node_id: state.selectedNodeId,
     default_edge_style: { stroke_color: "#8b96a5", stroke_width: scale(1, 0), opacity: 0.3 },
     selection_style: { stroke_color: "#0f172a", stroke_width: scale(4, 1), padding: scale(8, 1) },
-    margin: scale(48, 1)
+    margin: scale(48, 1),
+    motion: motionSpec()
   };
 }
 
@@ -933,7 +1482,8 @@ function buildNavilLayoutSubgraphSpec() {
     selection_style: variant.useDemoParams
       ? { stroke_color: "#0f172a", stroke_width: scale(4, 1), padding: scale(8, 1) }
       : { stroke_color: "#9ca3af", stroke_width: scale(4, 1), padding: scale(8, 1) },
-    margin: scale(variant.useDemoParams ? 48 : 40, 1)
+    margin: scale(variant.useDemoParams ? 48 : 40, 1),
+    motion: motionSpec()
   };
   return inducedSubgraph(
     baseSpec,
@@ -944,6 +1494,7 @@ function buildNavilLayoutSubgraphSpec() {
 
 function destroySession() {
   cancelTopologyAnimation();
+  cancelMotionAnimation();
   if (state.sessionHandle == null || typeof wasm.destroy_network_session !== "function") {
     state.sessionHandle = null;
     return;
@@ -962,14 +1513,90 @@ function cancelTopologyAnimation() {
   }
 }
 
+function cancelMotionAnimation() {
+  if (state.motionFrame != null) {
+    cancelAnimationFrame(state.motionFrame);
+    state.motionFrame = null;
+  }
+  state.motionLastFrameMs = null;
+}
+
 function syncSession({ recreate = false } = {}) {
   const spec = buildSpec();
+  state.currentSpec = spec;
   if (state.sessionHandle == null || recreate || typeof wasm.update_network_session !== "function") {
     destroySession();
     state.sessionHandle = wasm.create_network_session("network-canvas", spec);
+    refreshCurrentLayout();
     return;
   }
   wasm.update_network_session(state.sessionHandle, spec);
+  refreshCurrentLayout();
+}
+
+function renderNetworkFrame(timeSeconds = state.motionTimeSeconds) {
+  if (
+    state.motionEnabled &&
+    state.sessionHandle != null &&
+    typeof wasm.get_network_view_session === "function" &&
+    drawCanvasMotionFrame(
+      state.currentSpec,
+      state.currentLayout,
+      wasm.get_network_view_session(state.sessionHandle),
+      timeSeconds
+    )
+  ) {
+    return;
+  }
+  if (
+    state.motionEnabled &&
+    state.sessionHandle != null &&
+    typeof wasm.render_network_motion_session === "function"
+  ) {
+    wasm.render_network_motion_session(state.sessionHandle, timeSeconds);
+    return;
+  }
+  wasm.render_network_session(state.sessionHandle);
+}
+
+function startMotionAnimation() {
+  cancelMotionAnimation();
+  if (
+    !state.motionEnabled ||
+    state.sessionHandle == null ||
+    typeof wasm.render_network_motion_session !== "function"
+  ) {
+    return;
+  }
+
+  const handle = state.sessionHandle;
+  const tick = (now) => {
+    if (!state.motionEnabled || state.sessionHandle !== handle || state.transitionFrame != null) {
+      state.motionFrame = null;
+      state.motionLastFrameMs = null;
+      return;
+    }
+    if (state.motionLastFrameMs != null) {
+      const deltaSeconds = (now - state.motionLastFrameMs) / 1000;
+      if (Number.isFinite(deltaSeconds) && deltaSeconds > 0) {
+        state.motionTimeSeconds += Math.min(deltaSeconds, MAX_MOTION_DELTA_SECONDS);
+      }
+    }
+    state.motionLastFrameMs = now;
+    try {
+      renderNetworkFrame(state.motionTimeSeconds);
+    } catch (error) {
+      console.error("[navil-network] motion render failed", error);
+      state.motionFrame = null;
+      state.motionLastFrameMs = null;
+      state.motionEnabled = false;
+      renderSidebar();
+      wasm.render_network_session(handle);
+      return;
+    }
+    state.motionFrame = requestAnimationFrame(tick);
+  };
+  state.motionFrame = requestAnimationFrame(tick);
 }
 
 function animateTopologyTransition() {
@@ -979,7 +1606,8 @@ function animateTopologyTransition() {
     typeof wasm.render_network_transition_session !== "function" ||
     !wasm.has_network_transition_session(state.sessionHandle)
   ) {
-    wasm.render_network_session(state.sessionHandle);
+    renderNetworkFrame();
+    startMotionAnimation();
     return;
   }
 
@@ -1011,7 +1639,8 @@ function animateTopologyTransition() {
     if (typeof wasm.clear_network_transition_session === "function") {
       wasm.clear_network_transition_session(handle);
     }
-    wasm.render_network_session(handle);
+    renderNetworkFrame();
+    startMotionAnimation();
   };
 
   wasm.render_network_transition_session(handle, 0);
@@ -1020,13 +1649,15 @@ function animateTopologyTransition() {
 
 function renderGraph({ recreate = false, animateTopology = false } = {}) {
   cancelTopologyAnimation();
+  cancelMotionAnimation();
   const sizeChanged = syncCanvasSize();
   syncSession({ recreate: recreate || sizeChanged });
   renderMetrics();
   if (animateTopology && !recreate && !sizeChanged) {
     animateTopologyTransition();
   } else {
-    wasm.render_network_session(state.sessionHandle);
+    renderNetworkFrame();
+    startMotionAnimation();
   }
 }
 
@@ -1039,7 +1670,7 @@ function focusSelectedNode() {
   });
   if (view && typeof wasm.set_network_view_session === "function") {
     wasm.set_network_view_session(state.sessionHandle, view);
-    wasm.render_network_session(state.sessionHandle);
+    renderNetworkFrame();
   }
 }
 
@@ -1085,6 +1716,10 @@ function renderSidebar() {
     state.activeSubgraphId === COMPONENT_SUBGRAPH_ID && state.activeSubgraphLayout === SUBGRAPH_LAYOUT.NAVIL_DEMO_PARAMS
   );
   dom.wholeGraph.classList.toggle("is-active", state.activeSubgraphId == null);
+  dom.motionToggle.classList.toggle("is-active", state.motionEnabled);
+  for (const button of dom.motionModeButtons) {
+    button.classList.toggle("is-active", button.dataset.motionMode === state.motionMode);
+  }
   const fragment = document.createDocumentFragment();
   for (const { entry, depth } of visibleEntries()) {
     const id = nodeId(entry.order_index);
@@ -1413,6 +2048,20 @@ function showWholeGraph() {
   scrollSelectedIntoView();
 }
 
+function toggleMotion() {
+  state.motionEnabled = !state.motionEnabled;
+  renderSidebar();
+  renderGraph();
+}
+
+function selectMotionMode(mode) {
+  if (!MOTION_MODES.has(mode)) return;
+  state.motionMode = mode;
+  state.motionEnabled = true;
+  renderSidebar();
+  renderGraph();
+}
+
 function attachControls() {
   dom.reset.addEventListener("click", resetDemo);
   dom.expandAll.addEventListener("click", expandAll);
@@ -1424,53 +2073,94 @@ function attachControls() {
   dom.loadNavilAnchorStrongSubgraph.addEventListener("click", loadNavilAnchorStrongSubgraph);
   dom.loadNavilDemoParamsSubgraph.addEventListener("click", loadNavilDemoParamsSubgraph);
   dom.wholeGraph.addEventListener("click", showWholeGraph);
+  dom.motionToggle.addEventListener("click", toggleMotion);
+  for (const button of dom.motionModeButtons) {
+    button.addEventListener("click", () => selectMotionMode(button.dataset.motionMode));
+  }
 }
 
 function attachCanvasInteractions() {
   const drag = {
     active: false,
+    mode: null,
     moved: false,
     start: { x: 0, y: 0 },
-    last: { x: 0, y: 0 }
+    last: { x: 0, y: 0 },
+    rotationAnchor: null
   };
 
+  dom.canvas.addEventListener("contextmenu", (event) => {
+    event.preventDefault();
+  });
+
   dom.canvas.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 && event.button !== 2) return;
+    if (event.button === 2) {
+      event.preventDefault();
+    }
     const point = eventPoint(event);
     drag.active = true;
+    drag.mode = event.button === 2 ? "rotate" : "pan";
     drag.moved = false;
     drag.start = point;
     drag.last = point;
+    drag.rotationAnchor = drag.mode === "rotate" ? graphRotationAnchorPoint() : null;
     dom.canvas.setPointerCapture(event.pointerId);
-    dom.canvas.classList.add("is-dragging");
+    dom.canvas.classList.toggle("is-dragging", drag.mode === "pan");
+    dom.canvas.classList.toggle("is-rotating", drag.mode === "rotate");
   });
 
   dom.canvas.addEventListener("pointermove", (event) => {
     if (!drag.active || state.sessionHandle == null) return;
     const point = eventPoint(event);
+    const previousPoint = drag.last;
     const dx = point.x - drag.last.x;
     const dy = point.y - drag.last.y;
     if (dx === 0 && dy === 0) return;
     drag.last = point;
     drag.moved = drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) > 4;
+    if (drag.mode === "rotate") {
+      rotateGraphBy(rotationDeltaFromPointerDrag(drag.rotationAnchor, previousPoint, point), drag.rotationAnchor);
+      return;
+    }
     wasm.pan_network_session(state.sessionHandle, dx, dy);
-    wasm.render_network_session(state.sessionHandle);
+    renderNetworkFrame();
   });
 
   function finishPointer(event) {
     if (!drag.active) return;
     const point = eventPoint(event);
     const wasClick = !drag.moved || Math.hypot(point.x - drag.start.x, point.y - drag.start.y) <= 4;
+    const mode = drag.mode;
     drag.active = false;
+    drag.mode = null;
+    drag.rotationAnchor = null;
     dom.canvas.classList.remove("is-dragging");
+    dom.canvas.classList.remove("is-rotating");
     if (dom.canvas.hasPointerCapture(event.pointerId)) {
       dom.canvas.releasePointerCapture(event.pointerId);
     }
+    if (mode !== "pan") return;
     if (!wasClick || state.sessionHandle == null) return;
 
     try {
-      const hit = typeof wasm.pick_network_hit_session === "function"
-        ? wasm.pick_network_hit_session(state.sessionHandle, point.x, point.y)
-        : wasm.pick_network_node_session(state.sessionHandle, point.x, point.y);
+      const hit = state.motionEnabled && typeof wasm.pick_network_hit_motion_session === "function"
+        ? wasm.pick_network_hit_motion_session(
+            state.sessionHandle,
+            point.x,
+            point.y,
+            state.motionTimeSeconds
+          )
+        : typeof wasm.pick_network_hit_session === "function"
+          ? wasm.pick_network_hit_session(state.sessionHandle, point.x, point.y)
+          : state.motionEnabled && typeof wasm.pick_network_node_motion_session === "function"
+            ? wasm.pick_network_node_motion_session(
+                state.sessionHandle,
+                point.x,
+                point.y,
+                state.motionTimeSeconds
+              )
+            : wasm.pick_network_node_session(state.sessionHandle, point.x, point.y);
       const hitNodeId = hit?.node_id ?? null;
       const orderIndex = orderIndexFromNodeId(hitNodeId);
       const componentId = componentIdFromNodeId(hitNodeId);
@@ -1511,7 +2201,7 @@ function attachCanvasInteractions() {
       const point = eventPoint(event);
       const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1;
       wasm.zoom_network_session(state.sessionHandle, point.x, point.y, factor);
-      wasm.render_network_session(state.sessionHandle);
+      renderNetworkFrame();
     },
     { passive: false }
   );

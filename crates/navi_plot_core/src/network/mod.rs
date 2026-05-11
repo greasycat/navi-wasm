@@ -43,9 +43,7 @@ pub fn create_network_subgraph(
         .iter()
         .map(|node| node.id.as_str())
         .collect::<HashSet<_>>();
-    let included = included_node_ids
-        .into_iter()
-        .collect::<BTreeSet<_>>();
+    let included = included_node_ids.into_iter().collect::<BTreeSet<_>>();
 
     for node_id in &included {
         if !known_ids.contains(node_id.as_str()) {

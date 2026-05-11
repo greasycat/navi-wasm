@@ -26,8 +26,10 @@ pub(in crate::network) fn relax_positions(
         })
         .collect();
     let world_span = estimate_world_span(spec, positions.iter().copied());
-    let spring_length = (((world_span * world_span) / n as f64).sqrt() * spec.spring_length_scale).max(1.0);
-    let mut temperature = (world_span * 0.12 * spec.temperature_scale).max(WORLD_NODE_SPACING * 0.35);
+    let spring_length =
+        (((world_span * world_span) / n as f64).sqrt() * spec.spring_length_scale).max(1.0);
+    let mut temperature =
+        (world_span * 0.12 * spec.temperature_scale).max(WORLD_NODE_SPACING * 0.35);
     let inert: Vec<bool> = spec.nodes.iter().map(node_is_layout_inert).collect();
     let force_layers = resolved_force_layers(spec, None);
     let ordered_passes = ordered_force_passes(&force_layers);

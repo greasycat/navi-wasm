@@ -4,6 +4,7 @@ use super::*;
 pub struct NetworkSession {
     pub(super) spec: NetworkPlotSpec,
     pub(super) layout: BTreeMap<String, (f64, f64)>,
+    pub(super) radial_hierarchy: Option<HierarchicalLayout>,
     pub(super) resolved: BTreeMap<String, ResolvedNode>,
     pub(super) selection_style: ResolvedSelectionStyle,
     pub(super) view: ScreenTransform,
@@ -16,12 +17,14 @@ impl NetworkSession {
         validate(&spec)?;
         let resolved = resolve_nodes(&spec)?;
         let layout = compute_layout_with_zoom(&spec, 1.0)?;
+        let radial_hierarchy = build_hierarchical_layout(&spec);
         let selection_style =
             resolve_selection_style(SELECTION_RING_PADDING, spec.selection_style.as_ref())?;
         let view = ScreenTransform::new(spec.offset_x as f64, spec.offset_y as f64);
         Ok(Self {
             spec,
             layout,
+            radial_hierarchy,
             resolved,
             selection_style,
             view,
@@ -57,6 +60,7 @@ impl NetworkSession {
         };
         let selection_style =
             resolve_selection_style(SELECTION_RING_PADDING, spec.selection_style.as_ref())?;
+        let radial_hierarchy = build_hierarchical_layout(&spec);
         let view = self.view;
         let tracking = self.tracking.as_ref().and_then(|tracking| {
             NetworkTrackedPath::resolve(&spec, tracking.node_ids.clone())
@@ -72,6 +76,7 @@ impl NetworkSession {
             .then(|| choose_transition_anchor(&previous_spec, &spec, &previous_layout, &layout));
         self.spec = spec;
         self.layout = layout;
+        self.radial_hierarchy = radial_hierarchy;
         self.resolved = resolved;
         self.selection_style = selection_style;
         self.view = view;
@@ -132,10 +137,53 @@ impl NetworkSession {
         )
     }
 
+    pub fn render_motion_on<DB>(
+        &self,
+        root: PlotArea<DB>,
+        time_seconds: f64,
+    ) -> Result<(), PlotError>
+    where
+        DB: DrawingBackend,
+        DB::ErrorType: std::fmt::Debug + std::error::Error + Send + Sync,
+    {
+        let Some(layout) = self.animated_layout(time_seconds) else {
+            return self.render_on(root);
+        };
+        render_with_layout(
+            &root,
+            &self.spec,
+            &layout,
+            &self.resolved,
+            &self.selection_style,
+            &self.view,
+            self.tracking.as_ref(),
+        )
+    }
+
     pub fn pick(&self, canvas_x: f64, canvas_y: f64) -> Option<NetworkPickHit> {
         pick_hit_from_layout(
             &self.spec,
             &self.layout,
+            &self.resolved,
+            &self.selection_style,
+            &self.view,
+            canvas_x,
+            canvas_y,
+        )
+    }
+
+    pub fn pick_motion(
+        &self,
+        canvas_x: f64,
+        canvas_y: f64,
+        time_seconds: f64,
+    ) -> Option<NetworkPickHit> {
+        let Some(layout) = self.animated_layout(time_seconds) else {
+            return self.pick(canvas_x, canvas_y);
+        };
+        pick_hit_from_layout(
+            &self.spec,
+            &layout,
             &self.resolved,
             &self.selection_style,
             &self.view,
@@ -149,6 +197,16 @@ impl NetworkSession {
             .and_then(|hit| (hit.kind == NetworkPickKind::Node).then_some(hit.node_id))
     }
 
+    pub fn pick_node_motion(
+        &self,
+        canvas_x: f64,
+        canvas_y: f64,
+        time_seconds: f64,
+    ) -> Option<String> {
+        self.pick_motion(canvas_x, canvas_y, time_seconds)
+            .and_then(|hit| (hit.kind == NetworkPickKind::Node).then_some(hit.node_id))
+    }
+
     pub fn pan(&mut self, delta_x: f64, delta_y: f64) {
         self.view.pan_by(delta_x, delta_y);
         self.sync_view_to_spec();
@@ -157,6 +215,27 @@ impl NetworkSession {
     pub fn zoom_at(&mut self, canvas_x: f64, canvas_y: f64, factor: f64) -> Result<(), PlotError> {
         self.view.zoom_at(canvas_x, canvas_y, factor)?;
         self.sync_view_to_spec();
+        Ok(())
+    }
+
+    pub fn rotate_about(
+        &mut self,
+        canvas_x: f64,
+        canvas_y: f64,
+        angle_radians: f64,
+    ) -> Result<(), PlotError> {
+        ensure_finite("canvas_x", canvas_x)?;
+        ensure_finite("canvas_y", canvas_y)?;
+        ensure_finite("angle_radians", angle_radians)?;
+        if angle_radians.abs() <= f64::EPSILON {
+            return Ok(());
+        }
+
+        let origin = self.view.inverse((canvas_x, canvas_y));
+        rotate_layout_about(&mut self.layout, origin, angle_radians);
+        if let Some(transition) = self.transition.as_mut() {
+            rotate_layout_about(&mut transition.from_layout, origin, angle_radians);
+        }
         Ok(())
     }
 
@@ -288,6 +367,19 @@ impl NetworkSession {
         )
     }
 
+    pub fn render_motion_nodes(&self, time_seconds: f64) -> Vec<GraphNodeRenderInfo> {
+        let Some(layout) = self.animated_layout(time_seconds) else {
+            return self.render_nodes();
+        };
+        render_nodes_with_layout(
+            &self.spec,
+            &layout,
+            &self.resolved,
+            &self.selection_style,
+            &self.view,
+        )
+    }
+
     pub fn render_transition_nodes(&self, progress: f64) -> Vec<GraphNodeRenderInfo> {
         let Some(transition) = self.transition.as_ref() else {
             return self.render_nodes();
@@ -318,6 +410,19 @@ impl NetworkSession {
             .collect()
     }
 
+    pub(super) fn animated_layout(
+        &self,
+        time_seconds: f64,
+    ) -> Option<BTreeMap<String, (f64, f64)>> {
+        animated_radial_layout(
+            &self.spec,
+            &self.layout,
+            self.radial_hierarchy.as_ref(),
+            &self.view,
+            time_seconds,
+        )
+    }
+
     fn sync_view_to_spec(&mut self) {
         self.spec.offset_x = self.view.translate_x.round() as i32;
         self.spec.offset_y = self.view.translate_y.round() as i32;
@@ -341,4 +446,19 @@ fn resolved_cached_layout(
         layout.insert(node.id.clone(), (point.x, point.y));
     }
     Some(layout)
+}
+
+fn rotate_layout_about(
+    layout: &mut BTreeMap<String, (f64, f64)>,
+    origin: (f64, f64),
+    angle_radians: f64,
+) {
+    let cos = angle_radians.cos();
+    let sin = angle_radians.sin();
+    for point in layout.values_mut() {
+        let dx = point.0 - origin.0;
+        let dy = point.1 - origin.1;
+        point.0 = origin.0 + dx * cos - dy * sin;
+        point.1 = origin.1 + dx * sin + dy * cos;
+    }
 }

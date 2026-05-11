@@ -313,6 +313,10 @@ result_exports! {
         handle: u32,
     ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
     fn render_network_session(handle: u32) -> Result<(), wasm_bindgen::JsValue>;
+    fn render_network_motion_session(
+        handle: u32,
+        time_seconds: f64,
+    ) -> Result<(), wasm_bindgen::JsValue>;
     fn render_network_transition_session(
         handle: u32,
         progress: f64,
@@ -321,6 +325,12 @@ result_exports! {
         handle: u32,
         delta_x: f64,
         delta_y: f64,
+    ) -> Result<(), wasm_bindgen::JsValue>;
+    fn rotate_network_session(
+        handle: u32,
+        canvas_x: f64,
+        canvas_y: f64,
+        angle_radians: f64,
     ) -> Result<(), wasm_bindgen::JsValue>;
     fn zoom_network_session(
         handle: u32,
@@ -333,10 +343,22 @@ result_exports! {
         canvas_x: f64,
         canvas_y: f64,
     ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
+    fn pick_network_node_motion_session(
+        handle: u32,
+        canvas_x: f64,
+        canvas_y: f64,
+        time_seconds: f64,
+    ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
     fn pick_network_hit_session(
         handle: u32,
         canvas_x: f64,
         canvas_y: f64,
+    ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
+    fn pick_network_hit_motion_session(
+        handle: u32,
+        canvas_x: f64,
+        canvas_y: f64,
+        time_seconds: f64,
     ) -> Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>;
     fn set_network_selection(
         handle: u32,
